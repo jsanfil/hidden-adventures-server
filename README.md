@@ -24,6 +24,14 @@ TypeScript backend for the Hidden Adventures rebuild.
 - `docker compose exec -T app wget -qO- http://127.0.0.1:3000/api/health`
 - `docker compose down`
 
+## Testing
+
+- `npm test`
+- `npm run check`
+- `npm run build`
+
+The current suite covers the shipped read-only API surface and repository mapping behavior. Going forward, new server features should add or update tests in the same change.
+
 ## Initial Runtime Shape
 
 - `app`: Fastify-based API service

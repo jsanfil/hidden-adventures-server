@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { ZodError } from "zod";
 
 import { env } from "./config/env.js";
 import { db } from "./db/client.js";
@@ -9,6 +10,20 @@ export async function buildApp() {
     logger: {
       level: env.LOG_LEVEL
     }
+  });
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({
+        error: "Invalid request.",
+        details: error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message
+        }))
+      });
+    }
+
+    throw error;
   });
 
   app.addHook("onClose", async () => {
