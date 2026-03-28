@@ -1,4 +1,10 @@
-import { Pool, type PoolConfig, type QueryResult, type QueryResultRow } from "pg";
+import {
+  Pool,
+  type PoolClient,
+  type PoolConfig,
+  type QueryResult,
+  type QueryResultRow
+} from "pg";
 
 import { env } from "../config/env.js";
 
@@ -22,6 +28,33 @@ class DatabaseClient {
     values?: unknown[]
   ): Promise<QueryResult<TResult>> {
     return this.pool.query<TResult>(text, values);
+  }
+
+  async withClient<TResult>(callback: (client: PoolClient) => Promise<TResult>): Promise<TResult> {
+    const client = await this.pool.connect();
+
+    try {
+      return await callback(client);
+    } finally {
+      client.release();
+    }
+  }
+
+  async withTransaction<TResult>(
+    callback: (client: PoolClient) => Promise<TResult>
+  ): Promise<TResult> {
+    return this.withClient(async (client) => {
+      await client.query("begin");
+
+      try {
+        const result = await callback(client);
+        await client.query("commit");
+        return result;
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      }
+    });
   }
 
   async checkHealth(): Promise<{ latencyMs: number }> {
