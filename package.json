@@ -15,11 +15,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "tsx src/scripts/run-migrations.ts",
+    "db:migrate:dist": "node dist/scripts/run-migrations.js",
     "auth:sync-cognito": "tsx src/scripts/sync-cognito-users.ts",
     "migration:stage-archive": "tsx src/scripts/stage-mongo-archive.ts",
     "migration:transform-stage": "tsx src/scripts/transform-stage-to-work.ts",
     "migration:publish-run": "tsx src/scripts/publish-run.ts",
-    "migration:link-cognito": "tsx src/scripts/link-cognito-users.ts"
+    "migration:link-cognito": "tsx src/scripts/link-cognito-users.ts",
+    "smoke:staging": "sh deploy/smoke/staging-smoke.sh"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1019.0",

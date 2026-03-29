@@ -8,6 +8,7 @@ TypeScript backend for the Hidden Adventures rebuild.
 - hybrid API with clean resources plus workflow and query endpoints
 - local-first Docker development
 - cheap production deployment on AWS Lightsail
+- repeatable staging and deployment baseline for Slice 1 server rollout
 
 ## Getting Started
 
@@ -15,6 +16,22 @@ TypeScript backend for the Hidden Adventures rebuild.
 2. Install dependencies with `npm install`.
 3. Start the local stack with `docker compose up --build`.
 4. Run the app locally with `npm run dev` if you want to iterate outside Docker.
+
+## Deployment Baseline
+
+Deployment-oriented artifacts now live in `deploy/`:
+
+- `Dockerfile.deploy`: production-style server image that builds TypeScript once and runs `node dist/index.js`
+- `deploy/README.md`: image versioning, environment and secrets expectations, rollout and rollback steps, and the staging smoke path
+- `deploy/env/*.example`: staging and production runtime variable templates
+- `deploy/docker-compose.staging.yml`: minimal single-service compose example for a staging host using an external PostgreSQL database
+- `deploy/smoke/staging-smoke.sh`: repeatable smoke checks for the current Slice 1 server surface
+
+Helpful deployment commands:
+
+- `docker build -f Dockerfile.deploy -t hidden-adventures-server:$(git rev-parse --short HEAD) .`
+- `npm run db:migrate:dist`
+- `BASE_URL=https://your-staging-host npm run smoke:staging`
 
 ## Verified Local Commands
 
