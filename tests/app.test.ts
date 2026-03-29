@@ -69,6 +69,9 @@ describe("buildApp", () => {
     dbMock.query.mockReset();
     dbMock.checkHealth.mockReset();
     dbMock.close.mockReset();
+    dbMock.withTransaction.mockReset();
+
+    dbMock.withTransaction.mockImplementation(async (callback) => callback({ query: dbMock.query }));
   });
 
   afterEach(() => {
@@ -223,7 +226,7 @@ describe("buildApp", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab?viewerHandle=asanfil"
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
     });
 
     expect(response.statusCode).toBe(200);
@@ -261,7 +264,6 @@ describe("buildApp", () => {
         }
       }
     });
-
     await app.close();
   });
 
@@ -362,7 +364,6 @@ describe("buildApp", () => {
         returned: 1
       }
     });
-
     await app.close();
   });
 

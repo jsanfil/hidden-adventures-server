@@ -167,16 +167,14 @@ const feedJoins = `
 `;
 
 export async function listFeed(options: {
-  viewerHandle?: string;
+  viewerId?: string;
   limit: number;
   offset: number;
 }): Promise<AdventureCard[]> {
   const result = await db.query<AdventureFeedRow>(
     `
       with viewer as (
-        select id
-        from public.users
-        where handle = $1
+        select $1::uuid as id
       )
       ${feedSelect}
       ${feedJoins}
@@ -186,7 +184,7 @@ export async function listFeed(options: {
       limit $2
       offset $3
     `,
-    [options.viewerHandle ?? null, options.limit, options.offset]
+    [options.viewerId ?? null, options.limit, options.offset]
   );
 
   return result.rows.map(mapAdventureCard);
@@ -194,14 +192,12 @@ export async function listFeed(options: {
 
 export async function getAdventureById(options: {
   adventureId: string;
-  viewerHandle?: string;
+  viewerId?: string;
 }): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
   const result = await db.query<AdventureDetailRow>(
     `
       with viewer as (
-        select id
-        from public.users
-        where handle = $1
+        select $1::uuid as id
       )
       ${feedSelect},
       adventures.place_label,
@@ -212,7 +208,7 @@ export async function getAdventureById(options: {
         and ${visibilityClause()}
       limit 1
     `,
-    [options.viewerHandle ?? null, options.adventureId]
+    [options.viewerId ?? null, options.adventureId]
   );
 
   const row = result.rows[0];

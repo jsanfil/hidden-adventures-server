@@ -46,7 +46,7 @@ describe("adventures repository", () => {
     });
 
     const result = await listFeed({
-      viewerHandle: undefined,
+      viewerId: undefined,
       limit: 20,
       offset: 0
     });
@@ -82,6 +82,11 @@ describe("adventures repository", () => {
       20,
       0
     ]);
+    expect(dbMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("select $1::uuid as id"),
+      [null, 20, 0]
+    );
+    expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("where handle = $1");
   });
 
   it("returns null when a detail lookup finds no visible adventure", async () => {
@@ -94,5 +99,9 @@ describe("adventures repository", () => {
     });
 
     expect(result).toBeNull();
+    expect(dbMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("select $1::uuid as id"),
+      [null, "4b5edc1d-f292-45b4-8972-7b977ebf5298"]
+    );
   });
 });

@@ -54,6 +54,9 @@ describe("profiles repository", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-03-01T00:00:00.000Z"
     });
+    expect(dbMock.query).toHaveBeenCalledWith(expect.stringContaining("where users.handle = $1"), [
+      "jacksanfil"
+    ]);
   });
 
   it("returns an empty list when the profile handle does not resolve", async () => {
@@ -63,7 +66,7 @@ describe("profiles repository", () => {
 
     const result = await listProfileAdventures({
       profileHandle: "missing-user",
-      viewerHandle: undefined,
+      viewerId: undefined,
       limit: 20,
       offset: 0
     });
@@ -117,7 +120,7 @@ describe("profiles repository", () => {
 
     const result = await listProfileAdventures({
       profileHandle: "jacksanfil",
-      viewerHandle: "asanfil",
+      viewerId: "viewer-1",
       limit: 10,
       offset: 0
     });
@@ -150,6 +153,12 @@ describe("profiles repository", () => {
           averageRating: 4.67
         }
       }
+    ]);
+    expect(dbMock.query).toHaveBeenNthCalledWith(2, expect.stringContaining("select $1::uuid as id"), [
+      "viewer-1",
+      "jacksanfil",
+      10,
+      0
     ]);
   });
 });

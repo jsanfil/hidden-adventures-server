@@ -184,7 +184,7 @@ export async function getProfileByHandle(handle: string): Promise<ProfileDetail 
 
 export async function listProfileAdventures(options: {
   profileHandle: string;
-  viewerHandle?: string;
+  viewerId?: string;
   limit: number;
   offset: number;
 }): Promise<AdventureCard[]> {
@@ -196,9 +196,7 @@ export async function listProfileAdventures(options: {
   const result = await db.query<ProfileAdventureRow>(
     `
       with viewer as (
-        select id
-        from public.users
-        where handle = $1
+        select $1::uuid as id
       )
       select
         adventures.id::text as id,
@@ -234,7 +232,7 @@ export async function listProfileAdventures(options: {
       limit $3
       offset $4
     `,
-    [options.viewerHandle ?? null, options.profileHandle, options.limit, options.offset]
+    [options.viewerId ?? null, options.profileHandle, options.limit, options.offset]
   );
 
   return result.rows.map((row) => mapProfileAdventure(row, profile));

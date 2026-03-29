@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 
 import { env } from "./config/env.js";
 import { db } from "./db/client.js";
+import { authPlugin } from "./features/auth/plugin.js";
 import { registerRoutes } from "./routes/index.js";
 
 export async function buildApp() {
@@ -30,6 +31,7 @@ export async function buildApp() {
     await db.close();
   });
 
+  await app.register(authPlugin);
   await app.register(registerRoutes, { prefix: "/api" });
 
   app.get("/", async () => {

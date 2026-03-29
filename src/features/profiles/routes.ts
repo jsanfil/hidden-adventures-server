@@ -8,10 +8,9 @@ const profileParamsSchema = z.object({
 });
 
 const profileQuerySchema = z.object({
-  viewerHandle: z.string().trim().min(1).max(64).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0)
-});
+}).strict();
 
 export async function profileRoutes(app: FastifyInstance): Promise<void> {
   app.get("/profiles/:handle", async (request, reply) => {
@@ -27,7 +26,7 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
 
     const adventures = await listProfileAdventures({
       profileHandle: params.handle,
-      viewerHandle: query.viewerHandle,
+      viewerId: request.authContext?.viewer?.id,
       limit: query.limit,
       offset: query.offset
     });

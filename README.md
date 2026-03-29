@@ -75,4 +75,6 @@ Notes:
 - dry-run is the default; add `--apply` to persist `cognito_subject` links and audit rows
 - matching order is exact Cognito username first, then unique email, then manual review
 - in apply mode, the linking job now fails if the number of updated `users_work` rows does not match the number of linkable Cognito users
-- the new read endpoints currently accept optional `viewerHandle` query params as a temporary development stand-in for real authenticated viewer identity
+- read endpoints now resolve the viewer from the authenticated bearer token and use local `users.id` for visibility decisions
+- `handle` is the public username shown in the app and used for profile lookup; it is not the authenticated identity key
+- `displayName` is the optional friendly profile label and can differ from `handle`

@@ -15,15 +15,18 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "tsx src/scripts/run-migrations.ts",
+    "auth:sync-cognito": "tsx src/scripts/sync-cognito-users.ts",
     "migration:stage-archive": "tsx src/scripts/stage-mongo-archive.ts",
     "migration:transform-stage": "tsx src/scripts/transform-stage-to-work.ts",
     "migration:publish-run": "tsx src/scripts/publish-run.ts",
     "migration:link-cognito": "tsx src/scripts/link-cognito-users.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1019.0",
     "@types/pg": "^8.20.0",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
+    "jose": "^6.2.2",
     "pg": "^8.20.0",
     "zod": "^3.24.2"
   },
