@@ -269,7 +269,75 @@ describe("auth service", () => {
       email: "abandoned@example.com",
       matchedUserId: null,
       matchedHandle: null,
-      reason: "No legacy-profile-backed user matched by subject, handle, or unique email."
+      reason: "No legacy-profile-backed user matched by subject or exact handle."
+    });
+  });
+
+  it("ignores competing Cognito duplicates when a legacy handle is already linked", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "legacy-user-3",
+            cognito_subject: "approved-sub",
+            handle: "oldtrailfan",
+            email: "legacy@example.com",
+            account_origin: "legacy_profile_import",
+            status: "active",
+            created_at: "2018-01-01T00:00:00.000Z",
+            updated_at: "2026-03-01T00:00:00.000Z"
+          }
+        ]
+      });
+
+    const result = await reconcileLegacyIdentity(
+      {
+        sub: "competing-sub",
+        username: "oldtrailfan",
+        email: null,
+        emailVerified: false,
+        tokenUse: "id"
+      },
+      false
+    );
+
+    expect(result).toEqual({
+      action: "ignored_competing_cognito_duplicate",
+      cognitoUsername: "oldtrailfan",
+      cognitoSub: "competing-sub",
+      email: null,
+      matchedUserId: "legacy-user-3",
+      matchedHandle: "oldtrailfan",
+      reason:
+        "Legacy handle is already linked to a different Cognito subject; ignore this competing Cognito account for migration."
+    });
+  });
+
+  it("does not auto-link bulk sync users by email when the handle does not match", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await reconcileLegacyIdentity(
+      {
+        sub: "competing-sub-email",
+        username: null,
+        email: "legacy@example.com",
+        emailVerified: true,
+        tokenUse: "id"
+      },
+      false
+    );
+
+    expect(result).toEqual({
+      action: "skipped_no_legacy_profile_match",
+      cognitoUsername: null,
+      cognitoSub: "competing-sub-email",
+      email: "legacy@example.com",
+      matchedUserId: null,
+      matchedHandle: null,
+      reason: "No legacy-profile-backed user matched by subject or exact handle."
     });
   });
 });

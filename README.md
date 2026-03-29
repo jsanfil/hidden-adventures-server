@@ -73,7 +73,7 @@ Notes:
 - the publish job currently replaces the data in the `public` application tables from a chosen migration run and writes a reconciliation report comparing work-table counts to published counts
 - the linking job expects a Cognito export JSON shaped either as an array of users or an object with a `Users` array
 - dry-run is the default; add `--apply` to persist `cognito_subject` links and audit rows
-- matching order is exact Cognito username first, then unique email, then manual review
+- matching order is existing Cognito subject first, then exact Cognito username to legacy `handle`; bulk sync does not auto-link by email
 - in apply mode, the linking job now fails if the number of updated `users_work` rows does not match the number of linkable Cognito users
 - read endpoints now resolve the viewer from the authenticated bearer token and use local `users.id` for visibility decisions
 - `handle` is the public username shown in the app and used for profile lookup; it is not the authenticated identity key

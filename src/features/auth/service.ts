@@ -34,6 +34,7 @@ export type BootstrapResult = {
 
 export type LegacySyncAction =
   | "already_linked_by_cognito_subject"
+  | "ignored_competing_cognito_duplicate"
   | "linked_by_handle"
   | "linked_by_unique_email"
   | "manual_review_required"
@@ -249,13 +250,13 @@ async function buildLegacySyncEntry(
     if (handleMatch) {
       if (handleMatch.cognitoSubject && handleMatch.cognitoSubject !== identity.sub) {
         return {
-          action: "manual_review_required",
+          action: "ignored_competing_cognito_duplicate",
           cognitoUsername: identity.username,
           cognitoSub: identity.sub,
           email: normalizedEmail,
           matchedUserId: handleMatch.id,
           matchedHandle: handleMatch.handle,
-          reason: "Legacy handle already links to a different Cognito subject."
+          reason: "Legacy handle is already linked to a different Cognito subject; ignore this competing Cognito account for migration."
         };
       }
 
@@ -271,46 +272,6 @@ async function buildLegacySyncEntry(
     }
   }
 
-  if (normalizedEmail) {
-    const emailMatches = await listLegacyUsersByEmail(normalizedEmail, client);
-    if (emailMatches.length === 1) {
-      const emailMatch = emailMatches[0];
-      if (emailMatch.cognitoSubject && emailMatch.cognitoSubject !== identity.sub) {
-        return {
-          action: "manual_review_required",
-          cognitoUsername: identity.username,
-          cognitoSub: identity.sub,
-          email: normalizedEmail,
-          matchedUserId: emailMatch.id,
-          matchedHandle: emailMatch.handle,
-          reason: "Legacy email match is already linked to a different Cognito subject."
-        };
-      }
-
-      return {
-        action: "linked_by_unique_email",
-        cognitoUsername: identity.username,
-        cognitoSub: identity.sub,
-        email: normalizedEmail,
-        matchedUserId: emailMatch.id,
-        matchedHandle: emailMatch.handle,
-        reason: "Matched a legacy-profile-backed user by unique email."
-      };
-    }
-
-    if (emailMatches.length > 1) {
-      return {
-        action: "manual_review_required",
-        cognitoUsername: identity.username,
-        cognitoSub: identity.sub,
-        email: normalizedEmail,
-        matchedUserId: null,
-        matchedHandle: null,
-        reason: "Verified email matched multiple legacy-profile-backed users."
-      };
-    }
-  }
-
   return {
     action: "skipped_no_legacy_profile_match",
     cognitoUsername: identity.username,
@@ -318,7 +279,7 @@ async function buildLegacySyncEntry(
     email: normalizedEmail,
     matchedUserId: null,
     matchedHandle: null,
-    reason: "No legacy-profile-backed user matched by subject, handle, or unique email."
+    reason: "No legacy-profile-backed user matched by subject or exact handle."
   };
 }
 
