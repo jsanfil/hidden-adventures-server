@@ -32,6 +32,8 @@ TypeScript backend for the Hidden Adventures rebuild.
 
 The current suite covers the shipped Slice 1 read surface, auth bootstrap and handle selection behavior, repository mapping, and request validation. Read-route tests explicitly reject the retired `viewerHandle` query-param pattern.
 
+The locked Slice 1 contract handoff for the iOS thread lives in `docs/slice-1-contract.md`.
+
 ## Initial Runtime Shape
 
 - `app`: Fastify-based API service
@@ -51,6 +53,7 @@ Notes:
 - `GET /api/auth/bootstrap` and `POST /api/auth/handle` require a valid bearer token that resolves to a Cognito-backed identity.
 - `GET /api/feed`, `GET /api/adventures/:id`, and `GET /api/profiles/:handle` may be called without auth for public data, but connected-viewer behavior now comes only from authenticated auth context.
 - `viewerHandle` is no longer part of the public request contract.
+- no other Slice 1 API routes are currently locked or blessed for client integration
 
 ## Current Data And Identity Snapshot
 
