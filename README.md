@@ -5,7 +5,7 @@ TypeScript backend for the Hidden Adventures rebuild.
 ## Goals
 
 - relational domain model with PostgreSQL + PostGIS
-- hybrid API with clean resources plus workflow/query endpoints
+- hybrid API with clean resources plus workflow and query endpoints
 - local-first Docker development
 - cheap production deployment on AWS Lightsail
 
@@ -30,19 +30,42 @@ TypeScript backend for the Hidden Adventures rebuild.
 - `npm run check`
 - `npm run build`
 
-The current suite covers the shipped read-only API surface and repository mapping behavior. Going forward, new server features should add or update tests in the same change.
+The current suite covers the shipped Slice 1 read surface, auth bootstrap and handle selection behavior, repository mapping, and request validation. Read-route tests explicitly reject the retired `viewerHandle` query-param pattern.
 
 ## Initial Runtime Shape
 
 - `app`: Fastify-based API service
 - `postgres`: PostgreSQL 16 with PostGIS enabled via a repo-local ARM-native image build
 
-## Near-Term Next Steps
+## Current Implemented API Surface
 
-- add route modules for slice 1
-- add database access layer
-- add auth bootstrap against Cognito
-- document staging and production deployment
+- `GET /api/health`
+- `GET /api/auth/bootstrap`
+- `POST /api/auth/handle`
+- `GET /api/feed`
+- `GET /api/adventures/:id`
+- `GET /api/profiles/:handle`
+
+Notes:
+
+- `GET /api/auth/bootstrap` and `POST /api/auth/handle` require a valid bearer token that resolves to a Cognito-backed identity.
+- `GET /api/feed`, `GET /api/adventures/:id`, and `GET /api/profiles/:handle` may be called without auth for public data, but connected-viewer behavior now comes only from authenticated auth context.
+- `viewerHandle` is no longer part of the public request contract.
+
+## Current Data And Identity Snapshot
+
+- Server migration tooling can stage the legacy Mongo archive, transform it into normalized work tables, publish a selected import run into the real `public` tables, and emit reconciliation reports.
+- Import run `2` is currently published from the canonical archive.
+- Imported legacy profiles are linked locally to Cognito by exact handle with `2598` linked legacy users and `1383` extra Cognito accounts intentionally left unmatched.
+- Bulk reconciliation is intentionally handle-first for migration; verified-email matching remains a runtime bootstrap and recovery path.
+
+## Current Priority
+
+- lock contract documentation from the implemented response shapes
+- keep the Vitest suite as the authoritative server verification path for Slice 1
+- keep the Postman repo current for manual troubleshooting and API exploration
+- support the iOS thread as it replaces fixture-backed services with real network integration
+- define the first staging, deploy, and rollback baseline
 
 ## Migration Tooling
 
