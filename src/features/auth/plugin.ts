@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { getUserByCognitoSubject, type LocalUser } from "./repository.js";
-import { verifyCognitoToken } from "./cognito.js";
+import { createIdentityVerifier } from "./verifier.js";
 import type { AuthenticatedIdentity } from "./service.js";
 
 export type AuthContext = {
@@ -35,7 +35,16 @@ async function rejectUnauthorized(reply: FastifyReply, message: string) {
   });
 }
 
+export async function requireAuthenticatedRequest(request: FastifyRequest, reply: FastifyReply) {
+  if (request.authContext?.identity) {
+    return;
+  }
+
+  return rejectUnauthorized(reply, "Authentication required.");
+}
+
 export async function authPlugin(app: FastifyInstance): Promise<void> {
+  const verifyToken = createIdentityVerifier();
   app.decorateRequest("authContext", null);
 
   app.addHook("onRequest", async (request, reply) => {
@@ -46,7 +55,7 @@ export async function authPlugin(app: FastifyInstance): Promise<void> {
     }
 
     try {
-      const identity = await verifyCognitoToken(token);
+      const identity = await verifyToken(token);
       const viewer = await getUserByCognitoSubject(identity.sub);
       request.authContext = {
         identity,

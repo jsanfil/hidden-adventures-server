@@ -13,7 +13,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: npm run dev
+    command: docker-dev-start
 
   postgres:
     build:

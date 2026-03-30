@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
+import { requireAuthenticatedRequest } from "./plugin.js";
 import {
   HandleUnavailableError,
   bootstrapAuthenticatedIdentity,
@@ -29,6 +30,8 @@ function requireAuthenticatedIdentity(request: FastifyRequest, reply: FastifyRep
 }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
+  app.addHook("preHandler", requireAuthenticatedRequest);
+
   app.get("/auth/bootstrap", async (request, reply) => {
     const identity = requireAuthenticatedIdentity(request, reply);
     if (!identity) {

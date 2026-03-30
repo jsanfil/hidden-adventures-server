@@ -16,6 +16,8 @@
     "test:watch": "vitest",
     "db:migrate": "tsx src/scripts/run-migrations.ts",
     "db:migrate:dist": "node dist/scripts/run-migrations.js",
+    "db:backup:local": "tsx src/scripts/backup-local-postgres.ts",
+    "db:seed:local-fixtures": "POSTGRES_HOST=127.0.0.1 tsx src/scripts/seed-local-fixtures.ts",
     "auth:sync-cognito": "tsx src/scripts/sync-cognito-users.ts",
     "migration:stage-archive": "tsx src/scripts/stage-mongo-archive.ts",
     "migration:transform-stage": "tsx src/scripts/transform-stage-to-work.ts",

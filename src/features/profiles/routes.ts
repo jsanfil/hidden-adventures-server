@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
+import { requireAuthenticatedRequest } from "../auth/plugin.js";
 import { getProfileByHandle, listProfileAdventures } from "./repository.js";
 
 const profileParamsSchema = z.object({
@@ -13,6 +14,8 @@ const profileQuerySchema = z.object({
 }).strict();
 
 export async function profileRoutes(app: FastifyInstance): Promise<void> {
+  app.addHook("preHandler", requireAuthenticatedRequest);
+
   app.get("/profiles/:handle", async (request, reply) => {
     const params = profileParamsSchema.parse(request.params);
     const query = profileQuerySchema.parse(request.query);

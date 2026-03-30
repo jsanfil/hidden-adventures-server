@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
+import { requireAuthenticatedRequest } from "../auth/plugin.js";
 import { getAdventureById, listFeed } from "./repository.js";
 
 const feedQuerySchema = z.object({
@@ -15,6 +16,8 @@ const detailParamsSchema = z.object({
 });
 
 export async function adventureRoutes(app: FastifyInstance): Promise<void> {
+  app.addHook("preHandler", requireAuthenticatedRequest);
+
   app.get("/feed", async (request) => {
     const query = feedQuerySchema.parse(request.query);
     const items = await listFeed({

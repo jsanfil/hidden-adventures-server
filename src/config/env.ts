@@ -3,6 +3,8 @@ import { z } from "zod";
 
 config();
 
+const AuthModeSchema = z.enum(["cognito", "local_identity"]);
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -12,11 +14,26 @@ const EnvSchema = z.object({
   POSTGRES_DB: z.string().default("hidden_adventures"),
   POSTGRES_USER: z.string().default("hidden_adventures"),
   POSTGRES_PASSWORD: z.string().default("hidden_adventures"),
+  AUTH_MODE: AuthModeSchema.optional(),
   COGNITO_USER_POOL_ID: z.string().optional(),
   COGNITO_CLIENT_ID: z.string().optional(),
   AWS_REGION: z.string().default("us-west-2"),
-  S3_BUCKET: z.string().optional()
+  S3_BUCKET: z.string().optional(),
+  LOCAL_BACKUP_DIR: z.string().optional()
 });
 
-export const env = EnvSchema.parse(process.env);
+const parsedEnv = EnvSchema.parse(process.env);
 
+export type AuthMode = z.infer<typeof AuthModeSchema>;
+
+const authMode: AuthMode =
+  parsedEnv.AUTH_MODE ?? (parsedEnv.NODE_ENV === "production" ? "cognito" : "local_identity");
+
+if (parsedEnv.NODE_ENV === "production" && authMode !== "cognito") {
+  throw new Error('AUTH_MODE must be "cognito" when NODE_ENV is "production".');
+}
+
+export const env = {
+  ...parsedEnv,
+  AUTH_MODE: authMode
+};

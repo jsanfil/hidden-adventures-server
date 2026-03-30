@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  localFixtureContent,
+  localIdentityFixtures
+} from "../src/features/auth/local-fixtures.js";
+
 const { dbMock } = vi.hoisted(() => ({
   dbMock: {
     query: vi.fn(),
@@ -18,6 +23,26 @@ import { buildApp } from "../src/app.js";
 
 type QueryRows<T> = { rows: T[] };
 
+function authHeaders(token = localIdentityFixtures.connected_viewer.token) {
+  return {
+    authorization: `Bearer ${token}`
+  };
+}
+
+function makeLocalUserRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: localIdentityFixtures.connected_viewer.seededUser?.id ?? "viewer-123",
+    cognito_subject: localIdentityFixtures.connected_viewer.identity.sub,
+    handle: localIdentityFixtures.connected_viewer.seededUser?.handle,
+    email: localIdentityFixtures.connected_viewer.seededUser?.email,
+    account_origin: "rebuild_signup",
+    status: "active",
+    created_at: "2026-03-01T00:00:00.000Z",
+    updated_at: "2026-03-10T00:00:00.000Z",
+    ...overrides
+  };
+}
+
 function makeAdventureRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "adventure-1",
@@ -30,8 +55,8 @@ function makeAdventureRow(overrides: Record<string, unknown> = {}) {
     published_at: "2026-03-02T00:00:00.000Z",
     latitude: 34.12,
     longitude: -118.45,
-    author_handle: "jacksanfil",
-    author_display_name: "Jack",
+    author_handle: localFixtureContent.profileHandle,
+    author_display_name: "Fixture Author",
     author_home_city: "Los Angeles",
     author_home_region: "CA",
     primary_media_id: "media-1",
@@ -49,8 +74,8 @@ function makeAdventureRow(overrides: Record<string, unknown> = {}) {
 function makeProfileRow(overrides: Record<string, unknown> = {}) {
   return {
     user_id: "user-1",
-    handle: "jacksanfil",
-    display_name: "Jack",
+    handle: localFixtureContent.profileHandle,
+    display_name: "Fixture Author",
     bio: "Collector of hidden spots.",
     home_city: "Los Angeles",
     home_region: "CA",
@@ -147,15 +172,20 @@ describe("buildApp", () => {
   });
 
   it("returns the feed with paging metadata", async () => {
-    dbMock.query.mockResolvedValue({
-      rows: [makeAdventureRow()]
-    } as QueryRows<Record<string, unknown>>);
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow()]
+      } as QueryRows<Record<string, unknown>>);
 
     const app = await buildApp();
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/feed?limit=1&offset=0"
+      url: "/api/feed?limit=1&offset=0",
+      headers: authHeaders()
     });
 
     expect(response.statusCode).toBe(200);
@@ -175,8 +205,8 @@ describe("buildApp", () => {
             longitude: -118.45
           },
           author: {
-            handle: "jacksanfil",
-            displayName: "Jack",
+            handle: localFixtureContent.profileHandle,
+            displayName: "Fixture Author",
             homeCity: "Los Angeles",
             homeRegion: "CA"
           },
@@ -198,35 +228,62 @@ describe("buildApp", () => {
         returned: 1
       }
     });
-    expect(dbMock.query).toHaveBeenCalledTimes(1);
+    expect(dbMock.query).toHaveBeenCalledTimes(2);
 
     await app.close();
   });
 
-  it("returns 400 when feed query params are invalid", async () => {
+  it("requires auth for feed reads", async () => {
     const app = await buildApp();
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/feed?limit=0"
+      url: "/api/feed?limit=1&offset=0"
     });
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "Authentication required."
+    });
     expect(dbMock.query).not.toHaveBeenCalled();
 
     await app.close();
   });
 
-  it("returns adventure detail when visible to the caller", async () => {
-    dbMock.query.mockResolvedValue({
-      rows: [makeAdventureRow()]
+  it("returns 400 when feed query params are invalid", async () => {
+    dbMock.query.mockResolvedValueOnce({
+      rows: [makeLocalUserRow()]
     } as QueryRows<Record<string, unknown>>);
 
     const app = await buildApp();
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
+      url: "/api/feed?limit=0",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(dbMock.query).toHaveBeenCalledTimes(1);
+
+    await app.close();
+  });
+
+  it("returns adventure detail when visible to the caller", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow()]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+      headers: authHeaders()
     });
 
     expect(response.statusCode).toBe(200);
@@ -247,8 +304,8 @@ describe("buildApp", () => {
           longitude: -118.45
         },
         author: {
-          handle: "jacksanfil",
-          displayName: "Jack",
+          handle: localFixtureContent.profileHandle,
+          displayName: "Fixture Author",
           homeCity: "Los Angeles",
           homeRegion: "CA"
         },
@@ -268,15 +325,20 @@ describe("buildApp", () => {
   });
 
   it("returns 404 when the adventure is not visible or missing", async () => {
-    dbMock.query.mockResolvedValue({
-      rows: []
-    } as QueryRows<Record<string, unknown>>);
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: []
+      } as QueryRows<Record<string, unknown>>);
 
     const app = await buildApp();
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+      headers: authHeaders()
     });
 
     expect(response.statusCode).toBe(404);
@@ -289,6 +351,9 @@ describe("buildApp", () => {
 
   it("returns profile data and visible authored adventures", async () => {
     dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
       .mockResolvedValueOnce({
         rows: [makeProfileRow()]
       } as QueryRows<Record<string, unknown>>)
@@ -303,15 +368,16 @@ describe("buildApp", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/profiles/jacksanfil?limit=1&offset=0"
+      url: `/api/profiles/${localFixtureContent.profileHandle}?limit=1&offset=0`,
+      headers: authHeaders()
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       profile: {
         id: "user-1",
-        handle: "jacksanfil",
-        displayName: "Jack",
+        handle: localFixtureContent.profileHandle,
+        displayName: "Fixture Author",
         bio: "Collector of hidden spots.",
         homeCity: "Los Angeles",
         homeRegion: "CA",
@@ -341,8 +407,8 @@ describe("buildApp", () => {
             longitude: -118.45
           },
           author: {
-            handle: "jacksanfil",
-            displayName: "Jack",
+            handle: localFixtureContent.profileHandle,
+            displayName: "Fixture Author",
             homeCity: "Los Angeles",
             homeRegion: "CA"
           },
@@ -368,15 +434,20 @@ describe("buildApp", () => {
   });
 
   it("returns 404 when the profile does not exist", async () => {
-    dbMock.query.mockResolvedValueOnce({
-      rows: []
-    } as QueryRows<Record<string, unknown>>);
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: []
+      } as QueryRows<Record<string, unknown>>);
 
     const app = await buildApp();
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/profiles/missing-user"
+      url: "/api/profiles/missing-user",
+      headers: authHeaders()
     });
 
     expect(response.statusCode).toBe(404);

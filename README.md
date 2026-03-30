@@ -15,7 +15,12 @@ TypeScript backend for the Hidden Adventures rebuild.
 1. Copy `.env.example` to `.env`.
 2. Install dependencies with `npm install`.
 3. Start the local stack with `docker compose up --build`.
-4. Run the app locally with `npm run dev` if you want to iterate outside Docker.
+4. Seed the local auth fixtures with `npm run db:seed:local-fixtures`.
+5. Run the app locally with `npm run dev` if you want to iterate outside Docker.
+
+The Docker dev app now re-syncs `node_modules` on boot whenever `package.json` or `package-lock.json` changes, which prevents stale named-volume dependencies from leaving the server container up while the app process crashes.
+
+Local development defaults to `AUTH_MODE=local_identity`, which requires bearer auth for all business routes while accepting stable local tokens such as `local:connected_viewer` and `local:new_user`. Production must run with `AUTH_MODE=cognito`.
 
 ## Deployment Baseline
 
@@ -36,6 +41,8 @@ Helpful deployment commands:
 ## Verified Local Commands
 
 - `docker compose up --build -d`
+- `npm run db:backup:local`
+- `npm run db:seed:local-fixtures`
 - `docker compose ps`
 - `docker compose exec -T app wget -qO- http://127.0.0.1:3000/`
 - `docker compose exec -T app wget -qO- http://127.0.0.1:3000/api/health`
@@ -67,10 +74,23 @@ The locked Slice 1 contract handoff for the iOS thread lives in `docs/slice-1-co
 
 Notes:
 
-- `GET /api/auth/bootstrap` and `POST /api/auth/handle` require a valid bearer token that resolves to a Cognito-backed identity.
-- `GET /api/feed`, `GET /api/adventures/:id`, and `GET /api/profiles/:handle` may be called without auth for public data, but connected-viewer behavior now comes only from authenticated auth context.
+- `GET /api/health` remains public for readiness and Docker health checks.
+- All other current `/api` routes require `Authorization: Bearer <token>`.
+- In local/test mode (`AUTH_MODE=local_identity`), use stable tokens such as `local:connected_viewer`, `local:non_connected_viewer`, and `local:new_user`.
+- In production (`NODE_ENV=production`), the server fails fast unless `AUTH_MODE=cognito`.
 - `viewerHandle` is no longer part of the public request contract.
 - no other Slice 1 API routes are currently locked or blessed for client integration
+
+## Local Fixture Workflow
+
+- `npm run db:backup:local` creates a timestamped custom-format `pg_dump` outside the repo. The default location is `$HOME/.hidden-adventures/backups/postgres/`, or `LOCAL_BACKUP_DIR` if set.
+- `npm run db:seed:local-fixtures` always creates that backup first, then refreshes the managed local fixture users and content.
+- The seeded fixtures are:
+- `local:fixture_author`: linked author who owns the seeded profile and adventures
+- `local:connected_viewer`: linked viewer with an accepted connection to the author
+- `local:non_connected_viewer`: linked viewer with no accepted connection to the author
+- `local:new_user`: authenticated identity with no linked local user yet, used to exercise bootstrap and handle-selection flows
+- The seed refresh also populates representative profiles, public and connections-only adventures, a connection edge, comments, favorites, ratings, and adventure stats.
 
 ## Current Data And Identity Snapshot
 

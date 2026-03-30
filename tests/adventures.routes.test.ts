@@ -2,6 +2,8 @@ import Fastify from "fastify";
 import { ZodError } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { localIdentityFixtures } from "../src/features/auth/local-fixtures.js";
+
 const { getAdventureByIdMock, listFeedMock } = vi.hoisted(() => ({
   getAdventureByIdMock: vi.fn(),
   listFeedMock: vi.fn()
@@ -29,13 +31,7 @@ async function buildAdventureRouteApp(viewerId?: string) {
   app.addHook("onRequest", async (request) => {
     (request as typeof request & { authContext: unknown }).authContext = viewerId
       ? {
-          identity: {
-            sub: "sub-123",
-            username: "legacyjack",
-            email: "jack@example.com",
-            emailVerified: true,
-            tokenUse: "id"
-          },
+          identity: localIdentityFixtures.connected_viewer.identity,
           viewer: {
             id: viewerId
           }
@@ -51,6 +47,23 @@ describe("adventure routes", () => {
   beforeEach(() => {
     listFeedMock.mockReset();
     getAdventureByIdMock.mockReset();
+  });
+
+  it("requires auth for feed reads", async () => {
+    const app = await buildAdventureRouteApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?limit=1&offset=0"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "Authentication required."
+    });
+    expect(listFeedMock).not.toHaveBeenCalled();
+
+    await app.close();
   });
 
   it("passes authContext.viewer.id into feed reads", async () => {
@@ -81,7 +94,7 @@ describe("adventure routes", () => {
       }
     ]);
 
-    const app = await buildAdventureRouteApp("viewer-123");
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
 
     const response = await app.inject({
       method: "GET",
@@ -91,6 +104,7 @@ describe("adventure routes", () => {
     expect(response.statusCode).toBe(200);
     expect(listFeedMock).toHaveBeenCalledWith({
       viewerId: "viewer-123",
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
       limit: 1,
       offset: 0
     });
@@ -141,7 +155,7 @@ describe("adventure routes", () => {
       }
     });
 
-    const app = await buildAdventureRouteApp("viewer-123");
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
 
     const response = await app.inject({
       method: "GET",
@@ -151,14 +165,31 @@ describe("adventure routes", () => {
     expect(response.statusCode).toBe(200);
     expect(getAdventureByIdMock).toHaveBeenCalledWith({
       adventureId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
-      viewerId: "viewer-123"
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id
     });
 
     await app.close();
   });
 
+  it("requires auth for detail reads", async () => {
+    const app = await buildAdventureRouteApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "Authentication required."
+    });
+    expect(getAdventureByIdMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   it("rejects handle-based viewer query params", async () => {
-    const app = await buildAdventureRouteApp("viewer-123");
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
 
     const [feedResponse, detailResponse] = await Promise.all([
       app.inject({

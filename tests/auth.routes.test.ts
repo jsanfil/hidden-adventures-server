@@ -2,6 +2,10 @@ import Fastify from "fastify";
 import { ZodError } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  LOCAL_FIXTURE_DEFAULT_HANDLE,
+  localIdentityFixtures
+} from "../src/features/auth/local-fixtures.js";
 import { HandleUnavailableError } from "../src/features/auth/service.js";
 
 const { bootstrapAuthenticatedIdentityMock, completeHandleSelectionMock } = vi.hoisted(() => ({
@@ -46,7 +50,7 @@ async function buildAuthRouteApp(identity?: AuthenticatedIdentity) {
       ? {
           identity,
           viewer: {
-            id: "viewer-123"
+            id: localIdentityFixtures.connected_viewer.seededUser?.id ?? "viewer-123"
           }
         }
       : null;
@@ -80,21 +84,15 @@ describe("auth routes", () => {
   });
 
   it("passes the authenticated identity into auth bootstrap", async () => {
-    const identity = {
-      sub: "sub-123",
-      username: "legacyjack",
-      email: "jack@example.com",
-      emailVerified: true,
-      tokenUse: "id" as const
-    };
+    const identity = localIdentityFixtures.connected_viewer.identity;
     bootstrapAuthenticatedIdentityMock.mockResolvedValue({
       accountState: "linked",
       user: {
-        id: "user-1",
-        handle: "legacyjack"
+        id: localIdentityFixtures.connected_viewer.seededUser?.id,
+        handle: localIdentityFixtures.connected_viewer.seededUser?.handle
       },
       suggestedHandle: null,
-      recoveryEmail: "jack@example.com"
+      recoveryEmail: localIdentityFixtures.connected_viewer.seededUser?.email
     });
 
     const app = await buildAuthRouteApp(identity);
@@ -109,11 +107,11 @@ describe("auth routes", () => {
     expect(response.json()).toEqual({
       accountState: "linked",
       user: {
-        id: "user-1",
-        handle: "legacyjack"
+        id: localIdentityFixtures.connected_viewer.seededUser?.id,
+        handle: localIdentityFixtures.connected_viewer.seededUser?.handle
       },
       suggestedHandle: null,
-      recoveryEmail: "jack@example.com"
+      recoveryEmail: localIdentityFixtures.connected_viewer.seededUser?.email
     });
 
     await app.close();
@@ -140,13 +138,7 @@ describe("auth routes", () => {
   });
 
   it("rejects invalid handle payloads before calling the service", async () => {
-    const app = await buildAuthRouteApp({
-      sub: "sub-123",
-      username: "legacyjack",
-      email: "jack@example.com",
-      emailVerified: true,
-      tokenUse: "id"
-    });
+    const app = await buildAuthRouteApp(localIdentityFixtures.connected_viewer.identity);
 
     const response = await app.inject({
       method: "POST",
@@ -163,21 +155,15 @@ describe("auth routes", () => {
   });
 
   it("passes the authenticated identity and requested handle into handle selection", async () => {
-    const identity = {
-      sub: "sub-new",
-      username: "FreshUser",
-      email: "fresh@example.com",
-      emailVerified: true,
-      tokenUse: "id" as const
-    };
+    const identity = localIdentityFixtures.new_user.identity;
     completeHandleSelectionMock.mockResolvedValue({
       accountState: "linked",
       user: {
         id: "new-user-1",
-        handle: "new_user"
+        handle: LOCAL_FIXTURE_DEFAULT_HANDLE
       },
       suggestedHandle: null,
-      recoveryEmail: "fresh@example.com"
+      recoveryEmail: localIdentityFixtures.new_user.identity.email
     });
 
     const app = await buildAuthRouteApp(identity);
@@ -186,20 +172,20 @@ describe("auth routes", () => {
       method: "POST",
       url: "/api/auth/handle",
       payload: {
-        handle: "New_User"
+        handle: "Fixture_New_Handle"
       }
     });
 
     expect(response.statusCode).toBe(200);
-    expect(completeHandleSelectionMock).toHaveBeenCalledWith(identity, "New_User");
+    expect(completeHandleSelectionMock).toHaveBeenCalledWith(identity, "Fixture_New_Handle");
     expect(response.json()).toEqual({
       accountState: "linked",
       user: {
         id: "new-user-1",
-        handle: "new_user"
+        handle: LOCAL_FIXTURE_DEFAULT_HANDLE
       },
       suggestedHandle: null,
-      recoveryEmail: "fresh@example.com"
+      recoveryEmail: localIdentityFixtures.new_user.identity.email
     });
 
     await app.close();
@@ -208,13 +194,7 @@ describe("auth routes", () => {
   it("maps handle collisions to 409", async () => {
     completeHandleSelectionMock.mockRejectedValue(new HandleUnavailableError("taken_handle"));
 
-    const app = await buildAuthRouteApp({
-      sub: "sub-new",
-      username: "FreshUser",
-      email: "fresh@example.com",
-      emailVerified: true,
-      tokenUse: "id"
-    });
+    const app = await buildAuthRouteApp(localIdentityFixtures.new_user.identity);
 
     const response = await app.inject({
       method: "POST",

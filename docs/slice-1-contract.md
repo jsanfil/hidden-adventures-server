@@ -19,7 +19,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 
 ### `GET /api/feed`
 
-- auth: optional
+- auth: required
 - query:
   - `limit`: integer, min `1`, max `50`, default `20`
   - `offset`: integer, min `0`, default `0`
@@ -53,7 +53,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 
 ### `GET /api/adventures/:id`
 
-- auth: optional
+- auth: required
 - params:
   - `id`: UUID
 - any query param is rejected with `400`
@@ -68,7 +68,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 
 ### `GET /api/profiles/:handle`
 
-- auth: optional
+- auth: required
 - params:
   - `handle`: non-empty string up to `64` chars
 - query:
@@ -125,11 +125,14 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 
 ## Auth And Visibility Rules
 
-- Bearer auth is optional for read routes and required for auth routes.
+- `GET /api/health` is public; all other current `/api` routes require bearer auth.
+- Non-production may run with `AUTH_MODE=local_identity`, which accepts stable synthetic bearer tokens such as `local:connected_viewer`.
+- Production must run with `AUTH_MODE=cognito`.
 - Connected-viewer behavior comes only from authenticated auth context; there is no supported handle-based viewer override.
 - Invalid bearer tokens are rejected with `401` and `{ error: "Invalid authentication token." }`.
+- Missing bearer tokens on protected routes are rejected with `401` and `{ error: "Authentication required." }`.
 - Read visibility is currently:
-  - `public` adventures are readable without auth
+  - authenticated viewers can read `public` adventures
   - an authenticated author can read their own published adventures
   - an authenticated accepted connection can read `connections` visibility adventures
   - non-visible or missing adventures collapse to the same `404`
@@ -153,6 +156,5 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 
 ## Remaining Gaps Before Broader Slice 1 Completion
 
-- Real end-to-end Cognito token acquisition is still outside this repo’s automated verification path.
 - The iOS app still needs to replace fixture-era `viewerHandle` plumbing with bearer-token-backed auth/bootstrap integration.
 - No OpenAPI schema or generated client exists yet; the locked contract currently lives in route code, Vitest, and this handoff document.

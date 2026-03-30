@@ -2,6 +2,11 @@ import Fastify from "fastify";
 import { ZodError } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  localFixtureContent,
+  localIdentityFixtures
+} from "../src/features/auth/local-fixtures.js";
+
 const { getProfileByHandleMock, listProfileAdventuresMock } = vi.hoisted(() => ({
   getProfileByHandleMock: vi.fn(),
   listProfileAdventuresMock: vi.fn()
@@ -29,13 +34,7 @@ async function buildProfileRouteApp(viewerId?: string) {
   app.addHook("onRequest", async (request) => {
     (request as typeof request & { authContext: unknown }).authContext = viewerId
       ? {
-          identity: {
-            sub: "sub-123",
-            username: "legacyjack",
-            email: "jack@example.com",
-            emailVerified: true,
-            tokenUse: "id"
-          },
+          identity: localIdentityFixtures.connected_viewer.identity,
           viewer: {
             id: viewerId
           }
@@ -53,10 +52,28 @@ describe("profile routes", () => {
     listProfileAdventuresMock.mockReset();
   });
 
+  it("requires auth for profile reads", async () => {
+    const app = await buildProfileRouteApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/profiles/${localFixtureContent.profileHandle}?limit=1&offset=0`
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "Authentication required."
+    });
+    expect(getProfileByHandleMock).not.toHaveBeenCalled();
+    expect(listProfileAdventuresMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   it("resolves public profiles by handle and passes viewerId to authored adventure reads", async () => {
     getProfileByHandleMock.mockResolvedValue({
       id: "user-1",
-      handle: "jacksanfil",
+      handle: localFixtureContent.profileHandle,
       displayName: "Jack",
       bio: "Explorer",
       homeCity: "Los Angeles",
@@ -78,7 +95,7 @@ describe("profile routes", () => {
         publishedAt: "2026-03-02T00:00:00.000Z",
         location: null,
         author: {
-          handle: "jacksanfil",
+          handle: localFixtureContent.profileHandle,
           displayName: "Jack",
           homeCity: "Los Angeles",
           homeRegion: "CA"
@@ -93,29 +110,29 @@ describe("profile routes", () => {
       }
     ]);
 
-    const app = await buildProfileRouteApp("viewer-123");
+    const app = await buildProfileRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/profiles/jacksanfil?limit=1&offset=0"
+      url: `/api/profiles/${localFixtureContent.profileHandle}?limit=1&offset=0`
     });
 
     expect(response.statusCode).toBe(200);
-    expect(getProfileByHandleMock).toHaveBeenCalledWith("jacksanfil");
+    expect(getProfileByHandleMock).toHaveBeenCalledWith(localFixtureContent.profileHandle);
     expect(listProfileAdventuresMock).toHaveBeenCalledWith({
-      profileHandle: "jacksanfil",
-      viewerId: "viewer-123",
+      profileHandle: localFixtureContent.profileHandle,
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
       limit: 1,
       offset: 0
     });
     expect(response.json()).toEqual({
       profile: expect.objectContaining({
-        handle: "jacksanfil"
+        handle: localFixtureContent.profileHandle
       }),
       adventures: [
         expect.objectContaining({
           author: expect.objectContaining({
-            handle: "jacksanfil"
+            handle: localFixtureContent.profileHandle
           })
         })
       ],
@@ -132,7 +149,7 @@ describe("profile routes", () => {
   it("returns 404 for an unknown handle", async () => {
     getProfileByHandleMock.mockResolvedValue(null);
 
-    const app = await buildProfileRouteApp("viewer-123");
+    const app = await buildProfileRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
 
     const response = await app.inject({
       method: "GET",
@@ -146,11 +163,11 @@ describe("profile routes", () => {
   });
 
   it("rejects handle-based viewer query params", async () => {
-    const app = await buildProfileRouteApp("viewer-123");
+    const app = await buildProfileRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/profiles/jacksanfil?viewerHandle=asanfil"
+      url: `/api/profiles/${localFixtureContent.profileHandle}?viewerHandle=asanfil`
     });
 
     expect(response.statusCode).toBe(400);
