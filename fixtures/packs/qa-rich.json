@@ -1,0 +1,353 @@
+{
+  "version": 1,
+  "pack": "qa-rich",
+  "targetDatabase": "hidden_adventures_qa",
+  "personas": [
+    {
+      "key": "maya_trails",
+      "authMode": "cognito",
+      "username": "maya_trails",
+      "email": "maya.trails+qa@hidden-adventures.local",
+      "emailVerified": true,
+      "user": {
+        "handle": "maya_trails",
+        "displayName": "Maya Trails",
+        "bio": "Photographer, canyon chaser, and sunrise planner.",
+        "homeCity": "Los Angeles",
+        "homeRegion": "CA",
+        "accountOrigin": "rebuild_signup",
+        "createdAt": "2026-03-01T00:00:00.000Z",
+        "updatedAt": "2026-03-10T00:00:00.000Z",
+        "avatarMediaKey": "maya-avatar",
+        "coverMediaKey": "maya-cover"
+      }
+    },
+    {
+      "key": "owen_peak",
+      "authMode": "cognito",
+      "username": "owen_peak",
+      "email": "owen.peak+qa@hidden-adventures.local",
+      "emailVerified": true,
+      "user": {
+        "handle": "owen_peak",
+        "displayName": "Owen Peak",
+        "bio": "Weekend scrambler and route note obsessive.",
+        "homeCity": "Pasadena",
+        "homeRegion": "CA",
+        "accountOrigin": "rebuild_signup",
+        "createdAt": "2026-03-01T00:00:00.000Z",
+        "updatedAt": "2026-03-10T00:00:00.000Z",
+        "avatarMediaKey": "owen-avatar"
+      }
+    },
+    {
+      "key": "ivy_coast",
+      "authMode": "cognito",
+      "username": "ivy_coast",
+      "email": "ivy.coast+qa@hidden-adventures.local",
+      "emailVerified": true,
+      "user": {
+        "handle": "ivy_coast",
+        "displayName": "Ivy Coast",
+        "bio": "Low-tide scout and hidden beach collector.",
+        "homeCity": "Santa Monica",
+        "homeRegion": "CA",
+        "accountOrigin": "rebuild_signup",
+        "createdAt": "2026-03-01T00:00:00.000Z",
+        "updatedAt": "2026-03-10T00:00:00.000Z",
+        "avatarMediaKey": "ivy-avatar"
+      }
+    },
+    {
+      "key": "nora_night",
+      "authMode": "cognito",
+      "username": "nora_night",
+      "email": "nora.night+qa@hidden-adventures.local",
+      "emailVerified": true,
+      "user": {
+        "handle": "nora_night",
+        "displayName": "Nora Night",
+        "bio": "Golden-hour hiker and city-lights enthusiast.",
+        "homeCity": "Burbank",
+        "homeRegion": "CA",
+        "accountOrigin": "rebuild_signup",
+        "createdAt": "2026-03-01T00:00:00.000Z",
+        "updatedAt": "2026-03-10T00:00:00.000Z"
+      }
+    },
+    {
+      "key": "quiet_reader",
+      "authMode": "cognito",
+      "username": "quiet_reader",
+      "email": "quiet.reader+qa@hidden-adventures.local",
+      "emailVerified": true,
+      "user": {
+        "handle": "quiet_reader",
+        "displayName": "Quiet Reader",
+        "bio": "Mostly browsing, occasionally bookmarking.",
+        "homeCity": "Glendale",
+        "homeRegion": "CA",
+        "accountOrigin": "rebuild_signup",
+        "createdAt": "2026-03-01T00:00:00.000Z",
+        "updatedAt": "2026-03-10T00:00:00.000Z"
+      }
+    },
+    {
+      "key": "brand_new",
+      "authMode": "cognito",
+      "username": "brand_new",
+      "email": "brand.new+qa@hidden-adventures.local",
+      "emailVerified": true,
+      "user": null
+    }
+  ],
+  "mediaAssets": [
+    {
+      "key": "maya-avatar",
+      "ownerPersonaKey": "maya_trails",
+      "storageKey": "fixtures/qa-rich/profiles/maya-avatar.jpg",
+      "kind": "profile_avatar",
+      "createdAt": "2026-03-01T00:00:00.000Z",
+      "updatedAt": "2026-03-10T00:00:00.000Z"
+    },
+    {
+      "key": "maya-cover",
+      "ownerPersonaKey": "maya_trails",
+      "storageKey": "fixtures/qa-rich/profiles/maya-cover.jpg",
+      "kind": "profile_cover",
+      "createdAt": "2026-03-01T00:00:00.000Z",
+      "updatedAt": "2026-03-10T00:00:00.000Z"
+    },
+    {
+      "key": "owen-avatar",
+      "ownerPersonaKey": "owen_peak",
+      "storageKey": "fixtures/qa-rich/profiles/owen-avatar.jpg",
+      "kind": "profile_avatar",
+      "createdAt": "2026-03-01T00:00:00.000Z",
+      "updatedAt": "2026-03-10T00:00:00.000Z"
+    },
+    {
+      "key": "ivy-avatar",
+      "ownerPersonaKey": "ivy_coast",
+      "storageKey": "fixtures/qa-rich/profiles/ivy-avatar.jpg",
+      "kind": "profile_avatar",
+      "createdAt": "2026-03-01T00:00:00.000Z",
+      "updatedAt": "2026-03-10T00:00:00.000Z"
+    },
+    {
+      "key": "sunset-ridge-image",
+      "ownerPersonaKey": "maya_trails",
+      "storageKey": "fixtures/qa-rich/adventures/sunset-ridge.jpg",
+      "kind": "adventure_image",
+      "createdAt": "2026-03-02T00:00:00.000Z",
+      "updatedAt": "2026-03-03T00:00:00.000Z"
+    },
+    {
+      "key": "hidden-tidepool-image",
+      "ownerPersonaKey": "ivy_coast",
+      "storageKey": "fixtures/qa-rich/adventures/hidden-tidepool.jpg",
+      "kind": "adventure_image",
+      "createdAt": "2026-03-03T00:00:00.000Z",
+      "updatedAt": "2026-03-04T00:00:00.000Z"
+    },
+    {
+      "key": "city-lights-image",
+      "ownerPersonaKey": "nora_night",
+      "storageKey": "fixtures/qa-rich/adventures/city-lights-overlook.jpg",
+      "kind": "adventure_image",
+      "createdAt": "2026-03-04T00:00:00.000Z",
+      "updatedAt": "2026-03-05T00:00:00.000Z"
+    },
+    {
+      "key": "foggy-pines-image",
+      "ownerPersonaKey": "owen_peak",
+      "storageKey": "fixtures/qa-rich/adventures/foggy-pines.jpg",
+      "kind": "adventure_image",
+      "createdAt": "2026-03-05T00:00:00.000Z",
+      "updatedAt": "2026-03-06T00:00:00.000Z"
+    },
+    {
+      "key": "dry-river-image",
+      "ownerPersonaKey": "maya_trails",
+      "storageKey": "fixtures/qa-rich/adventures/dry-river.jpg",
+      "kind": "adventure_image",
+      "createdAt": "2026-03-06T00:00:00.000Z",
+      "updatedAt": "2026-03-07T00:00:00.000Z"
+    }
+  ],
+  "connections": [
+    {
+      "key": "maya-owen",
+      "userKeyA": "maya_trails",
+      "userKeyB": "owen_peak",
+      "initiatedByPersonaKey": "owen_peak",
+      "status": "accepted",
+      "requestedAt": "2026-03-02T10:00:00.000Z",
+      "respondedAt": "2026-03-02T12:00:00.000Z",
+      "updatedAt": "2026-03-02T12:00:00.000Z"
+    },
+    {
+      "key": "maya-ivy",
+      "userKeyA": "maya_trails",
+      "userKeyB": "ivy_coast",
+      "initiatedByPersonaKey": "maya_trails",
+      "status": "accepted",
+      "requestedAt": "2026-03-03T10:00:00.000Z",
+      "respondedAt": "2026-03-03T12:00:00.000Z",
+      "updatedAt": "2026-03-03T12:00:00.000Z"
+    }
+  ],
+  "adventures": [
+    {
+      "key": "sunset-ridge",
+      "authorPersonaKey": "maya_trails",
+      "title": "Sunset Ridge Shortcut",
+      "summary": "Short climb with a big payoff over the canyon wall.",
+      "body": "A quick uphill push to a ridge line that glows at golden hour and feels hidden even on busy weekends.",
+      "categorySlug": "viewpoints",
+      "visibility": "public",
+      "status": "published",
+      "longitude": -118.407,
+      "latitude": 34.102,
+      "placeLabel": "Sunset Ridge",
+      "primaryMediaKey": "sunset-ridge-image",
+      "createdAt": "2026-03-02T00:00:00.000Z",
+      "updatedAt": "2026-03-03T00:00:00.000Z",
+      "publishedAt": "2026-03-02T10:00:00.000Z"
+    },
+    {
+      "key": "hidden-tidepool",
+      "authorPersonaKey": "ivy_coast",
+      "title": "Hidden Tidepool Window",
+      "summary": "Low-tide window with clear pools and almost no foot traffic.",
+      "body": "Best reached in the hour before the lowest tide. The rocks open up to a tucked-away shelf with bright water and starfish.",
+      "categorySlug": "water_spots",
+      "visibility": "public",
+      "status": "published",
+      "longitude": -118.515,
+      "latitude": 34.008,
+      "placeLabel": "Hidden Tidepool",
+      "primaryMediaKey": "hidden-tidepool-image",
+      "createdAt": "2026-03-03T00:00:00.000Z",
+      "updatedAt": "2026-03-04T00:00:00.000Z",
+      "publishedAt": "2026-03-03T11:00:00.000Z"
+    },
+    {
+      "key": "city-lights",
+      "authorPersonaKey": "nora_night",
+      "title": "City Lights Overlook",
+      "summary": "Night-access overlook with a fast walk and wide skyline view.",
+      "body": "A safe, short evening route that opens over the valley. Strong for testing night copy, profile states, and media cards.",
+      "categorySlug": "viewpoints",
+      "visibility": "public",
+      "status": "published",
+      "longitude": -118.298,
+      "latitude": 34.164,
+      "placeLabel": "City Lights Overlook",
+      "primaryMediaKey": "city-lights-image",
+      "createdAt": "2026-03-04T00:00:00.000Z",
+      "updatedAt": "2026-03-05T00:00:00.000Z",
+      "publishedAt": "2026-03-04T12:00:00.000Z"
+    },
+    {
+      "key": "foggy-pines",
+      "authorPersonaKey": "owen_peak",
+      "title": "Foggy Pines Traverse",
+      "summary": "Connections-only route note for a misty forest traverse.",
+      "body": "This is the sort of entry only accepted connections should see. Good for visibility QA and map-card parity later.",
+      "categorySlug": "forest_walks",
+      "visibility": "connections",
+      "status": "published",
+      "longitude": -118.233,
+      "latitude": 34.219,
+      "placeLabel": "Foggy Pines",
+      "primaryMediaKey": "foggy-pines-image",
+      "createdAt": "2026-03-05T00:00:00.000Z",
+      "updatedAt": "2026-03-06T00:00:00.000Z",
+      "publishedAt": "2026-03-05T12:00:00.000Z"
+    },
+    {
+      "key": "dry-river",
+      "authorPersonaKey": "maya_trails",
+      "title": "Dry River Scramble",
+      "summary": "Loose scramble and wash crossing for edge-case visibility and stats.",
+      "body": "Useful for exercising longer bodies, stronger warning copy, and a second Maya-authored public card in the feed.",
+      "categorySlug": "desert_spots",
+      "visibility": "public",
+      "status": "published",
+      "longitude": -118.558,
+      "latitude": 34.177,
+      "placeLabel": "Dry River Wash",
+      "primaryMediaKey": "dry-river-image",
+      "createdAt": "2026-03-06T00:00:00.000Z",
+      "updatedAt": "2026-03-07T00:00:00.000Z",
+      "publishedAt": "2026-03-06T12:00:00.000Z"
+    }
+  ],
+  "favorites": [
+    {
+      "personaKey": "owen_peak",
+      "adventureKey": "sunset-ridge",
+      "createdAt": "2026-03-07T00:00:00.000Z"
+    },
+    {
+      "personaKey": "quiet_reader",
+      "adventureKey": "hidden-tidepool",
+      "createdAt": "2026-03-07T01:00:00.000Z"
+    },
+    {
+      "personaKey": "ivy_coast",
+      "adventureKey": "sunset-ridge",
+      "createdAt": "2026-03-07T02:00:00.000Z"
+    }
+  ],
+  "ratings": [
+    {
+      "personaKey": "owen_peak",
+      "adventureKey": "sunset-ridge",
+      "score": 5,
+      "createdAt": "2026-03-08T00:00:00.000Z",
+      "updatedAt": "2026-03-08T00:00:00.000Z"
+    },
+    {
+      "personaKey": "quiet_reader",
+      "adventureKey": "hidden-tidepool",
+      "score": 4,
+      "createdAt": "2026-03-08T01:00:00.000Z",
+      "updatedAt": "2026-03-08T01:00:00.000Z"
+    },
+    {
+      "personaKey": "maya_trails",
+      "adventureKey": "city-lights",
+      "score": 5,
+      "createdAt": "2026-03-08T02:00:00.000Z",
+      "updatedAt": "2026-03-08T02:00:00.000Z"
+    }
+  ],
+  "comments": [
+    {
+      "key": "sunset-ridge-owen",
+      "adventureKey": "sunset-ridge",
+      "authorPersonaKey": "owen_peak",
+      "body": "Great after-work climb. The last turn really opens up.",
+      "createdAt": "2026-03-09T00:00:00.000Z",
+      "updatedAt": "2026-03-09T00:00:00.000Z"
+    },
+    {
+      "key": "hidden-tidepool-reader",
+      "adventureKey": "hidden-tidepool",
+      "authorPersonaKey": "quiet_reader",
+      "body": "Saved this for the next low tide weekend.",
+      "createdAt": "2026-03-09T01:00:00.000Z",
+      "updatedAt": "2026-03-09T01:00:00.000Z"
+    },
+    {
+      "key": "foggy-pines-maya",
+      "adventureKey": "foggy-pines",
+      "authorPersonaKey": "maya_trails",
+      "body": "The mist hangs in the second stretch until almost noon.",
+      "createdAt": "2026-03-09T02:00:00.000Z",
+      "updatedAt": "2026-03-09T02:00:00.000Z"
+    }
+  ]
+}

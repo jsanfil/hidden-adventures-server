@@ -126,7 +126,8 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 ## Auth And Visibility Rules
 
 - `GET /api/health` is public; all other current `/api` routes require bearer auth.
-- Non-production may run with `AUTH_MODE=local_identity`, which accepts stable synthetic bearer tokens such as `local:connected_viewer`.
+- Local automation runs with `AUTH_MODE=test_jwt` and deterministic signed test tokens minted from the `test-core` fixture pack.
+- Local manual QA runs with `AUTH_MODE=cognito` against a dedicated non-prod Cognito pool and the `qa-rich` fixture pack.
 - Production must run with `AUTH_MODE=cognito`.
 - Connected-viewer behavior comes only from authenticated auth context; there is no supported handle-based viewer override.
 - Invalid bearer tokens are rejected with `401` and `{ error: "Invalid authentication token." }`.

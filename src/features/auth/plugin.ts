@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
+import { env } from "../../config/env.js";
 import { getUserByCognitoSubject, type LocalUser } from "./repository.js";
 import { createIdentityVerifier } from "./verifier.js";
 import type { AuthenticatedIdentity } from "./service.js";
@@ -62,7 +63,7 @@ export async function authPlugin(app: FastifyInstance): Promise<void> {
         viewer
       };
     } catch (error) {
-      request.log.warn({ err: error }, "Failed to authenticate Cognito bearer token.");
+      request.log.warn({ err: error, authMode: env.AUTH_MODE }, "Failed to authenticate bearer token.");
       return rejectUnauthorized(reply, "Invalid authentication token.");
     }
   });

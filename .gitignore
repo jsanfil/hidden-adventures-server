@@ -1,7 +1,8 @@
 node_modules/
 dist/
 .env
+.env.local.automation
+.env.local.manual-qa
 .DS_Store
 .idea/
 .vscode/
-

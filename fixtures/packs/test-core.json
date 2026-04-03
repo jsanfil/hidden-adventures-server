@@ -1,0 +1,204 @@
+{
+  "version": 1,
+  "pack": "test-core",
+  "targetDatabase": "hidden_adventures_test",
+  "personas": [
+    {
+      "key": "fixture_author",
+      "authMode": "test_jwt",
+      "username": "fixture_author",
+      "email": "fixture.author@hidden-adventures.local",
+      "emailVerified": true,
+      "testJwtSub": "test-sub-fixture-author",
+      "user": {
+        "handle": "fixture_author",
+        "displayName": "Fixture Author",
+        "bio": "Automation author persona for regression coverage.",
+        "homeCity": "Los Angeles",
+        "homeRegion": "CA",
+        "accountOrigin": "rebuild_signup",
+        "createdAt": "2026-03-01T00:00:00.000Z",
+        "updatedAt": "2026-03-10T00:00:00.000Z",
+        "avatarMediaKey": "fixture-author-avatar",
+        "coverMediaKey": "fixture-author-cover"
+      }
+    },
+    {
+      "key": "connected_viewer",
+      "authMode": "test_jwt",
+      "username": "connected_viewer",
+      "email": "fixture.connected@hidden-adventures.local",
+      "emailVerified": true,
+      "testJwtSub": "test-sub-connected-viewer",
+      "user": {
+        "handle": "connected_viewer",
+        "displayName": "Connected Viewer",
+        "bio": "Automation viewer with an accepted connection.",
+        "homeCity": "Pasadena",
+        "homeRegion": "CA",
+        "accountOrigin": "rebuild_signup",
+        "createdAt": "2026-03-01T00:00:00.000Z",
+        "updatedAt": "2026-03-10T00:00:00.000Z",
+        "avatarMediaKey": "connected-viewer-avatar"
+      }
+    },
+    {
+      "key": "non_connected_viewer",
+      "authMode": "test_jwt",
+      "username": "non_connected_viewer",
+      "email": "fixture.unconnected@hidden-adventures.local",
+      "emailVerified": true,
+      "testJwtSub": "test-sub-non-connected-viewer",
+      "user": {
+        "handle": "non_connected_viewer",
+        "displayName": "Non Connected Viewer",
+        "bio": "Automation viewer with no accepted connection to the author.",
+        "homeCity": "Burbank",
+        "homeRegion": "CA",
+        "accountOrigin": "rebuild_signup",
+        "createdAt": "2026-03-01T00:00:00.000Z",
+        "updatedAt": "2026-03-10T00:00:00.000Z"
+      }
+    },
+    {
+      "key": "new_user",
+      "authMode": "test_jwt",
+      "username": "new_user",
+      "email": "fixture.new@hidden-adventures.local",
+      "emailVerified": true,
+      "testJwtSub": "test-sub-new-user",
+      "user": null
+    }
+  ],
+  "mediaAssets": [
+    {
+      "key": "fixture-author-avatar",
+      "ownerPersonaKey": "fixture_author",
+      "storageKey": "fixtures/test-core/profiles/fixture-author-avatar.jpg",
+      "kind": "profile_avatar",
+      "createdAt": "2026-03-01T00:00:00.000Z",
+      "updatedAt": "2026-03-10T00:00:00.000Z"
+    },
+    {
+      "key": "fixture-author-cover",
+      "ownerPersonaKey": "fixture_author",
+      "storageKey": "fixtures/test-core/profiles/fixture-author-cover.jpg",
+      "kind": "profile_cover",
+      "createdAt": "2026-03-01T00:00:00.000Z",
+      "updatedAt": "2026-03-10T00:00:00.000Z"
+    },
+    {
+      "key": "connected-viewer-avatar",
+      "ownerPersonaKey": "connected_viewer",
+      "storageKey": "fixtures/test-core/profiles/connected-viewer-avatar.jpg",
+      "kind": "profile_avatar",
+      "createdAt": "2026-03-01T00:00:00.000Z",
+      "updatedAt": "2026-03-10T00:00:00.000Z"
+    },
+    {
+      "key": "fixture-falls-image",
+      "ownerPersonaKey": "fixture_author",
+      "storageKey": "fixtures/test-core/adventures/fixture-falls.jpg",
+      "kind": "adventure_image",
+      "createdAt": "2026-03-02T00:00:00.000Z",
+      "updatedAt": "2026-03-03T00:00:00.000Z"
+    },
+    {
+      "key": "connected-canyon-image",
+      "ownerPersonaKey": "fixture_author",
+      "storageKey": "fixtures/test-core/adventures/connected-canyon.jpg",
+      "kind": "adventure_image",
+      "createdAt": "2026-03-05T00:00:00.000Z",
+      "updatedAt": "2026-03-06T00:00:00.000Z"
+    }
+  ],
+  "connections": [
+    {
+      "key": "author-connected-viewer",
+      "userKeyA": "fixture_author",
+      "userKeyB": "connected_viewer",
+      "initiatedByPersonaKey": "connected_viewer",
+      "status": "accepted",
+      "requestedAt": "2026-03-04T00:00:00.000Z",
+      "respondedAt": "2026-03-04T01:00:00.000Z",
+      "updatedAt": "2026-03-04T01:00:00.000Z"
+    }
+  ],
+  "adventures": [
+    {
+      "key": "fixture-falls",
+      "authorPersonaKey": "fixture_author",
+      "title": "Fixture Falls",
+      "summary": "Seeded public adventure for automation and UI regression.",
+      "body": "This public adventure should be visible to any authenticated automation persona.",
+      "categorySlug": "water_spots",
+      "visibility": "public",
+      "status": "published",
+      "longitude": -118.4512,
+      "latitude": 34.1201,
+      "placeLabel": "Fixture Falls Trailhead",
+      "primaryMediaKey": "fixture-falls-image",
+      "createdAt": "2026-03-02T00:00:00.000Z",
+      "updatedAt": "2026-03-03T00:00:00.000Z",
+      "publishedAt": "2026-03-02T12:00:00.000Z"
+    },
+    {
+      "key": "connected-canyon",
+      "authorPersonaKey": "fixture_author",
+      "title": "Connected Canyon",
+      "summary": "Seeded connections-only adventure for automation visibility checks.",
+      "body": "Only accepted connections should see this seeded adventure during automated regression.",
+      "categorySlug": "viewpoints",
+      "visibility": "connections",
+      "status": "published",
+      "longitude": -118.4411,
+      "latitude": 34.131,
+      "placeLabel": "Connected Canyon Ridge",
+      "primaryMediaKey": "connected-canyon-image",
+      "createdAt": "2026-03-05T00:00:00.000Z",
+      "updatedAt": "2026-03-06T00:00:00.000Z",
+      "publishedAt": "2026-03-05T12:00:00.000Z"
+    }
+  ],
+  "favorites": [
+    {
+      "personaKey": "connected_viewer",
+      "adventureKey": "fixture-falls",
+      "createdAt": "2026-03-07T00:00:00.000Z"
+    }
+  ],
+  "ratings": [
+    {
+      "personaKey": "connected_viewer",
+      "adventureKey": "fixture-falls",
+      "score": 5,
+      "createdAt": "2026-03-07T01:00:00.000Z",
+      "updatedAt": "2026-03-07T01:00:00.000Z"
+    },
+    {
+      "personaKey": "non_connected_viewer",
+      "adventureKey": "fixture-falls",
+      "score": 4,
+      "createdAt": "2026-03-07T01:00:00.000Z",
+      "updatedAt": "2026-03-07T01:00:00.000Z"
+    }
+  ],
+  "comments": [
+    {
+      "key": "public-connected-viewer",
+      "adventureKey": "fixture-falls",
+      "authorPersonaKey": "connected_viewer",
+      "body": "Saving this for a weekend revisit.",
+      "createdAt": "2026-03-07T02:00:00.000Z",
+      "updatedAt": "2026-03-07T02:00:00.000Z"
+    },
+    {
+      "key": "connections-author",
+      "adventureKey": "connected-canyon",
+      "authorPersonaKey": "fixture_author",
+      "body": "Connections can meet here just before sunset.",
+      "createdAt": "2026-03-08T02:00:00.000Z",
+      "updatedAt": "2026-03-08T02:00:00.000Z"
+    }
+  ]
+}

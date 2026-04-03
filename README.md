@@ -12,15 +12,22 @@ TypeScript backend for the Hidden Adventures rebuild.
 
 ## Getting Started
 
-1. Copy `.env.example` to `.env`.
-2. Install dependencies with `npm install`.
-3. Start the local stack with `docker compose up --build`.
-4. Seed the local auth fixtures with `npm run db:seed:local-fixtures`.
-5. Run the app locally with `npm run dev` if you want to iterate outside Docker.
+1. Install dependencies with `npm install`.
+2. Start the local stack with `docker compose up --build`.
+3. Create the local databases:
+   - `npm run db:create:qa`
+   - `npm run db:create:test`
+4. Migrate the local databases:
+   - `npm run db:migrate:qa`
+   - `npm run db:migrate:test`
+5. Choose a local mode:
+   - mobile app manual QA backend prep: `npm run fixtures:validate -- --pack qa-rich`, `npm run fixtures:verify-media -- --pack qa-rich`, `npm run fixtures:provision-cognito -- --pack qa-rich`, `npm run fixtures:seed-db -- --pack qa-rich`, then `npm run dev:manual-qa`
+   - automated server regression: `npm run test:regression`
+6. Run the app locally with the mode-specific env file and start script if you want to iterate outside Docker.
 
 The Docker dev app now re-syncs `node_modules` on boot whenever `package.json` or `package-lock.json` changes, which prevents stale named-volume dependencies from leaving the server container up while the app process crashes.
 
-Local development defaults to `AUTH_MODE=local_identity`, which requires bearer auth for all business routes while accepting stable local tokens such as `local:connected_viewer` and `local:new_user`. Production must run with `AUTH_MODE=cognito`.
+Non-production now defaults to `AUTH_MODE=test_jwt`, which is the local automation path. Manual QA uses `AUTH_MODE=cognito` with a dedicated non-prod Cognito pool and the `hidden_adventures_qa` database. Production must run with `AUTH_MODE=cognito`.
 
 ## Deployment Baseline
 
@@ -41,8 +48,13 @@ Helpful deployment commands:
 ## Verified Local Commands
 
 - `docker compose up --build -d`
-- `npm run db:backup:local`
-- `npm run db:seed:local-fixtures`
+- `npm run db:create:qa`
+- `npm run db:create:test`
+- `npm run db:migrate:qa`
+- `npm run db:migrate:test`
+- `npm run fixtures:validate -- --pack test-core`
+- `npm run fixtures:seed-db -- --pack test-core`
+- `npm run fixtures:mint-test-token -- --pack test-core --persona connected_viewer`
 - `docker compose ps`
 - `docker compose exec -T app wget -qO- http://127.0.0.1:3000/`
 - `docker compose exec -T app wget -qO- http://127.0.0.1:3000/api/health`
@@ -76,21 +88,49 @@ Notes:
 
 - `GET /api/health` remains public for readiness and Docker health checks.
 - All other current `/api` routes require `Authorization: Bearer <token>`.
-- In local/test mode (`AUTH_MODE=local_identity`), use stable tokens such as `local:connected_viewer`, `local:non_connected_viewer`, and `local:new_user`.
+- In local automation mode (`AUTH_MODE=test_jwt`), mint deterministic tokens with `npm run fixtures:mint-test-token -- --pack test-core --persona <persona-key>`.
+- In local mobile-app manual QA mode (`AUTH_MODE=cognito`), use the dedicated non-prod Cognito pool and the `hidden_adventures_qa` database.
 - In production (`NODE_ENV=production`), the server fails fast unless `AUTH_MODE=cognito`.
 - `viewerHandle` is no longer part of the public request contract.
 - no other Slice 1 API routes are currently locked or blessed for client integration
 
-## Local Fixture Workflow
+## Local Modes and Fixture Packs
 
-- `npm run db:backup:local` creates a timestamped custom-format `pg_dump` outside the repo. The default location is `$HOME/.hidden-adventures/backups/postgres/`, or `LOCAL_BACKUP_DIR` if set.
-- `npm run db:seed:local-fixtures` always creates that backup first, then refreshes the managed local fixture users and content.
-- The seeded fixtures are:
-- `local:fixture_author`: linked author who owns the seeded profile and adventures
-- `local:connected_viewer`: linked viewer with an accepted connection to the author
-- `local:non_connected_viewer`: linked viewer with no accepted connection to the author
-- `local:new_user`: authenticated identity with no linked local user yet, used to exercise bootstrap and handle-selection flows
-- The seed refresh also populates representative profiles, public and connections-only adventures, a connection edge, comments, favorites, ratings, and adventure stats.
+- The local server supports two explicit modes:
+  - `local-manual-qa` via `.env.local.manual-qa` and `npm run dev:manual-qa`
+  - `local-automation-test-core` via `.env.local.automation` and `npm run dev:automation`
+- One local Postgres container hosts two logical databases:
+  - `hidden_adventures_qa`
+  - `hidden_adventures_test`
+- Fixture data now lives in manifest packs under `fixtures/packs/`, not in server auth source files.
+- The fixture packs are:
+  - `qa-rich`: rich mobile-app manual QA dataset for `hidden_adventures_qa`
+  - `test-core`: deterministic regression dataset for `hidden_adventures_test`
+- Seed commands fail fast if the pack does not match the current target database.
+- The legacy `local_identity` fixture code remains temporarily supported for compatibility tests, but it is no longer the default non-production workflow.
+
+## Mobile App Manual QA Backend Prep
+
+1. Start Docker and Postgres with `docker compose up --build`.
+2. Create and migrate the QA database with `npm run db:create:qa` and `npm run db:migrate:qa`.
+3. Validate and verify the fixture pack:
+   - `npm run fixtures:validate -- --pack qa-rich`
+   - `npm run fixtures:verify-media -- --pack qa-rich`
+4. Provision or reconcile the QA personas in the non-prod Cognito pool:
+   - `npm run fixtures:provision-cognito -- --pack qa-rich`
+5. Seed the QA database:
+   - `npm run fixtures:seed-db -- --pack qa-rich`
+6. Start the server:
+   - `npm run dev:manual-qa`
+7. Launch the iOS app in its `LocalManualQA` scheme and use this backend as the app-test target.
+
+This workflow prepares a realistic backend for manual mobile-app testing. It is not the server regression path.
+
+## Automated Server Regression Workflow
+
+1. Run `npm run test:regression` for the normal edit and test loop.
+2. Run `npm run test:regression:clean` when you want a full database rebuild before tests.
+3. Use `npm run dev:automation` only when you want to point another client or harness at the local automation server outside the Vitest flow.
 
 ## Current Data And Identity Snapshot
 

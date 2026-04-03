@@ -19,6 +19,16 @@ vi.mock("../src/db/client.js", () => ({
   db: dbMock
 }));
 
+vi.mock("../src/config/env.js", () => ({
+  env: {
+    PORT: 3000,
+    LOG_LEVEL: "info",
+    AUTH_MODE: "local_identity",
+    SERVER_RUNTIME_MODE: "local_automation_test_core",
+    POSTGRES_DB: "hidden_adventures_test"
+  }
+}));
+
 import { buildApp } from "../src/app.js";
 
 type QueryRows<T> = { rows: T[] };

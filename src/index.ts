@@ -5,6 +5,15 @@ async function main() {
   const app = await buildApp();
 
   try {
+    app.log.info(
+      {
+        runtimeMode: env.SERVER_RUNTIME_MODE,
+        authMode: env.AUTH_MODE,
+        database: env.POSTGRES_DB
+      },
+      "Starting Hidden Adventures server."
+    );
+
     await app.listen({
       host: "0.0.0.0",
       port: env.PORT
@@ -16,4 +25,3 @@ async function main() {
 }
 
 void main();
-
