@@ -10,7 +10,12 @@ vi.mock("../src/db/client.js", () => ({
   db: dbMock
 }));
 
-import { getProfileByHandle, listProfileAdventures } from "../src/features/profiles/repository.js";
+import {
+  getProfileByHandle,
+  getProfileByUserId,
+  listProfileAdventures,
+  updateMyProfile
+} from "../src/features/profiles/repository.js";
 
 describe("profiles repository", () => {
   beforeEach(() => {
@@ -56,6 +61,93 @@ describe("profiles repository", () => {
     });
     expect(dbMock.query).toHaveBeenCalledWith(expect.stringContaining("where users.handle = $1"), [
       "jacksanfil"
+    ]);
+  });
+
+  it("resolves a profile by authenticated user id", async () => {
+    dbMock.query.mockResolvedValue({
+      rows: [
+        {
+          user_id: "user-1",
+          handle: "viewer",
+          display_name: "Viewer",
+          bio: "Explorer",
+          home_city: "Portland",
+          home_region: "OR",
+          avatar_media_id: null,
+          avatar_storage_key: null,
+          cover_media_id: null,
+          cover_storage_key: null,
+          created_at: "2026-01-01T00:00:00.000Z",
+          updated_at: "2026-03-01T00:00:00.000Z"
+        }
+      ]
+    });
+
+    const result = await getProfileByUserId("user-1");
+
+    expect(result).toEqual({
+      id: "user-1",
+      handle: "viewer",
+      displayName: "Viewer",
+      bio: "Explorer",
+      homeCity: "Portland",
+      homeRegion: "OR",
+      avatar: null,
+      cover: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z"
+    });
+    expect(dbMock.query).toHaveBeenCalledWith(expect.stringContaining("where users.id = $1::uuid"), [
+      "user-1"
+    ]);
+  });
+
+  it("normalizes blanks to null and returns the saved profile when updating my profile", async () => {
+    dbMock.query.mockResolvedValue({
+      rows: [
+        {
+          user_id: "user-1",
+          handle: "viewer",
+          display_name: "Viewer",
+          bio: null,
+          home_city: "Seattle",
+          home_region: null,
+          avatar_media_id: null,
+          avatar_storage_key: null,
+          cover_media_id: null,
+          cover_storage_key: null,
+          created_at: "2026-01-01T00:00:00.000Z",
+          updated_at: "2026-03-02T00:00:00.000Z"
+        }
+      ]
+    });
+
+    const result = await updateMyProfile("user-1", {
+      displayName: " Viewer ",
+      bio: "   ",
+      homeCity: " Seattle ",
+      homeRegion: ""
+    });
+
+    expect(result).toEqual({
+      id: "user-1",
+      handle: "viewer",
+      displayName: "Viewer",
+      bio: null,
+      homeCity: "Seattle",
+      homeRegion: null,
+      avatar: null,
+      cover: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-03-02T00:00:00.000Z"
+    });
+    expect(dbMock.query).toHaveBeenCalledWith(expect.stringContaining("insert into public.profiles"), [
+      "user-1",
+      "Viewer",
+      null,
+      "Seattle",
+      null
     ]);
   });
 

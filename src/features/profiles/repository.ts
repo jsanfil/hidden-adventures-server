@@ -1,7 +1,9 @@
-import type { QueryResultRow } from "pg";
+import type { PoolClient, QueryResult, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
 import type { AdventureCard } from "../adventures/repository.js";
+
+type Queryable = PoolClient | typeof db;
 
 type ProfileRow = QueryResultRow & {
   user_id: string;
@@ -55,6 +57,38 @@ export type ProfileDetail = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type MeProfileUpdateRequest = {
+  displayName: string | null;
+  bio: string | null;
+  homeCity: string | null;
+  homeRegion: string | null;
+};
+
+function getExecutor(client?: PoolClient): Queryable {
+  return client ?? db;
+}
+
+async function runQuery<TResult extends QueryResultRow>(
+  client: PoolClient | undefined,
+  text: string,
+  values: unknown[]
+): Promise<QueryResult<TResult>> {
+  const executor = getExecutor(client) as {
+    query: (sql: string, params: unknown[]) => Promise<QueryResult<TResult>>;
+  };
+
+  return executor.query(text, values);
+}
+
+function normalizeOptionalText(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 function mapProfile(row: ProfileRow): ProfileDetail {
   return {
@@ -149,8 +183,13 @@ function profileAdventureVisibilityClause(): string {
   `;
 }
 
-export async function getProfileByHandle(handle: string): Promise<ProfileDetail | null> {
-  const result = await db.query<ProfileRow>(
+async function getProfileByWhereClause(
+  whereClause: string,
+  value: string,
+  client?: PoolClient
+): Promise<ProfileDetail | null> {
+  const result = await runQuery<ProfileRow>(
+    client,
     `
       select
         users.id::text as user_id,
@@ -163,8 +202,8 @@ export async function getProfileByHandle(handle: string): Promise<ProfileDetail 
         avatar.storage_key as avatar_storage_key,
         cover.id::text as cover_media_id,
         cover.storage_key as cover_storage_key,
-        users.created_at::text as created_at,
-        users.updated_at::text as updated_at
+        coalesce(profiles.created_at, users.created_at)::text as created_at,
+        coalesce(profiles.updated_at, users.updated_at)::text as updated_at
       from public.users users
       left join public.profiles profiles
         on profiles.user_id = users.id
@@ -172,10 +211,94 @@ export async function getProfileByHandle(handle: string): Promise<ProfileDetail 
         on avatar.id = profiles.avatar_media_asset_id
       left join public.media_assets cover
         on cover.id = profiles.cover_media_asset_id
-      where users.handle = $1
+      where ${whereClause}
       limit 1
     `,
-    [handle]
+    [value]
+  );
+
+  const row = result.rows[0];
+  return row ? mapProfile(row) : null;
+}
+
+export async function getProfileByHandle(handle: string): Promise<ProfileDetail | null> {
+  return getProfileByWhereClause("users.handle = $1", handle);
+}
+
+export async function getProfileByUserId(userId: string): Promise<ProfileDetail | null> {
+  return getProfileByWhereClause("users.id = $1::uuid", userId);
+}
+
+export async function updateMyProfile(
+  userId: string,
+  input: MeProfileUpdateRequest,
+  client?: PoolClient
+): Promise<ProfileDetail | null> {
+  const result = await runQuery<ProfileRow>(
+    client,
+    `
+      with upserted as (
+        insert into public.profiles (
+          user_id,
+          display_name,
+          bio,
+          home_city,
+          home_region,
+          avatar_media_asset_id,
+          cover_media_asset_id,
+          created_at,
+          updated_at
+        ) values (
+          $1::uuid,
+          $2,
+          $3,
+          $4,
+          $5,
+          null,
+          null,
+          now(),
+          now()
+        )
+        on conflict (user_id)
+        do update set
+          display_name = excluded.display_name,
+          bio = excluded.bio,
+          home_city = excluded.home_city,
+          home_region = excluded.home_region,
+          updated_at = now()
+        returning user_id
+      )
+      select
+        users.id::text as user_id,
+        users.handle,
+        profiles.display_name,
+        profiles.bio,
+        profiles.home_city,
+        profiles.home_region,
+        avatar.id::text as avatar_media_id,
+        avatar.storage_key as avatar_storage_key,
+        cover.id::text as cover_media_id,
+        cover.storage_key as cover_storage_key,
+        coalesce(profiles.created_at, users.created_at)::text as created_at,
+        coalesce(profiles.updated_at, users.updated_at)::text as updated_at
+      from upserted
+      join public.users users
+        on users.id = upserted.user_id
+      left join public.profiles profiles
+        on profiles.user_id = users.id
+      left join public.media_assets avatar
+        on avatar.id = profiles.avatar_media_asset_id
+      left join public.media_assets cover
+        on cover.id = profiles.cover_media_asset_id
+      limit 1
+    `,
+    [
+      userId,
+      normalizeOptionalText(input.displayName),
+      normalizeOptionalText(input.bio),
+      normalizeOptionalText(input.homeCity),
+      normalizeOptionalText(input.homeRegion)
+    ]
   );
 
   const row = result.rows[0];

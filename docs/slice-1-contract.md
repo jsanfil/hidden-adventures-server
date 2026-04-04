@@ -93,6 +93,35 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - stable `adventures` item shape:
   - same as `GET /api/feed`
 
+### `GET /api/me/profile`
+
+- auth: required
+- response:
+  - `200` with `{ profile }` for the authenticated viewer
+  - `401` with `{ error: "Authentication required." }` when no authenticated identity is present
+  - `404` with `{ error: "Profile not found." }` when the authenticated viewer has no resolvable local profile row
+- stable `profile` fields:
+  - same as `GET /api/profiles/:handle`
+
+### `PUT /api/me/profile`
+
+- auth: required
+- request body:
+  - `displayName`: string or `null`
+  - `bio`: string or `null`
+  - `homeCity`: string or `null`
+  - `homeRegion`: string or `null`
+- write behavior:
+  - trims all string fields
+  - empty strings are normalized to `null`
+  - creates the backing `profiles` row if the authenticated viewer does not have one yet
+  - does not edit `handle`; public handle creation remains on `POST /api/auth/handle`
+- response:
+  - `200` with `{ profile }` for the saved viewer profile
+  - `401` with `{ error: "Authentication required." }` when no authenticated identity is present
+  - `400` when the request body fails validation
+
+
 ### `GET /api/auth/bootstrap`
 
 - auth: required
@@ -152,7 +181,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 ## Intentional Non-Contract Items
 
 - No map-specific endpoint exists yet in this server repo.
-- No favorites, comments, ratings, connections management, or profile-edit write surface is part of this lock.
+- No favorites, comments, ratings, or connections-management write surface is part of this lock.
 - Postman request definitions are for manual smoke checks only and are not formal acceptance.
 
 ## Remaining Gaps Before Broader Slice 1 Completion

@@ -7,14 +7,23 @@ import {
   localIdentityFixtures
 } from "../src/features/auth/local-fixtures.js";
 
-const { getProfileByHandleMock, listProfileAdventuresMock } = vi.hoisted(() => ({
+const {
+  getProfileByHandleMock,
+  getProfileByUserIdMock,
+  listProfileAdventuresMock,
+  updateMyProfileMock
+} = vi.hoisted(() => ({
   getProfileByHandleMock: vi.fn(),
-  listProfileAdventuresMock: vi.fn()
+  getProfileByUserIdMock: vi.fn(),
+  listProfileAdventuresMock: vi.fn(),
+  updateMyProfileMock: vi.fn()
 }));
 
 vi.mock("../src/features/profiles/repository.js", () => ({
   getProfileByHandle: getProfileByHandleMock,
-  listProfileAdventures: listProfileAdventuresMock
+  getProfileByUserId: getProfileByUserIdMock,
+  listProfileAdventures: listProfileAdventuresMock,
+  updateMyProfile: updateMyProfileMock
 }));
 
 import { profileRoutes } from "../src/features/profiles/routes.js";
@@ -49,7 +58,9 @@ async function buildProfileRouteApp(viewerId?: string) {
 describe("profile routes", () => {
   beforeEach(() => {
     getProfileByHandleMock.mockReset();
+    getProfileByUserIdMock.mockReset();
     listProfileAdventuresMock.mockReset();
+    updateMyProfileMock.mockReset();
   });
 
   it("requires auth for profile reads", async () => {
@@ -173,6 +184,117 @@ describe("profile routes", () => {
     expect(response.statusCode).toBe(400);
     expect(getProfileByHandleMock).not.toHaveBeenCalled();
     expect(listProfileAdventuresMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("reads the authenticated viewer profile from /me/profile", async () => {
+    getProfileByUserIdMock.mockResolvedValue({
+      id: "user-1",
+      handle: "viewer_handle",
+      displayName: "Viewer",
+      bio: "Test",
+      homeCity: "Portland",
+      homeRegion: "OR",
+      avatar: null,
+      cover: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z"
+    });
+
+    const app = await buildProfileRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/me/profile"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(getProfileByUserIdMock).toHaveBeenCalledWith(
+      localIdentityFixtures.connected_viewer.seededUser?.id
+    );
+    expect(response.json()).toEqual({
+      profile: expect.objectContaining({
+        handle: "viewer_handle"
+      })
+    });
+
+    await app.close();
+  });
+
+  it("requires auth for /me/profile reads", async () => {
+    const app = await buildProfileRouteApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/me/profile"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(getProfileByUserIdMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("updates the authenticated viewer profile", async () => {
+    updateMyProfileMock.mockResolvedValue({
+      id: "user-1",
+      handle: "viewer_handle",
+      displayName: "Viewer",
+      bio: "Updated bio",
+      homeCity: "Seattle",
+      homeRegion: "WA",
+      avatar: null,
+      cover: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-03-02T00:00:00.000Z"
+    });
+
+    const app = await buildProfileRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/me/profile",
+      payload: {
+        displayName: " Viewer ",
+        bio: "Updated bio",
+        homeCity: "Seattle",
+        homeRegion: "WA"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(updateMyProfileMock).toHaveBeenCalledWith(
+      localIdentityFixtures.connected_viewer.seededUser?.id,
+      {
+        displayName: " Viewer ",
+        bio: "Updated bio",
+        homeCity: "Seattle",
+        homeRegion: "WA"
+      }
+    );
+    expect(response.json()).toEqual({
+      profile: expect.objectContaining({
+        homeRegion: "WA"
+      })
+    });
+
+    await app.close();
+  });
+
+  it("rejects invalid /me/profile payloads", async () => {
+    const app = await buildProfileRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/me/profile",
+      payload: {
+        displayName: ["wrong type"]
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(updateMyProfileMock).not.toHaveBeenCalled();
 
     await app.close();
   });
