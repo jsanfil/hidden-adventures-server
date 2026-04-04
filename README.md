@@ -82,6 +82,8 @@ The locked Slice 1 contract handoff for the iOS thread lives in `docs/slice-1-co
 - `POST /api/auth/handle`
 - `GET /api/feed`
 - `GET /api/adventures/:id`
+- `GET /api/adventures/:id/media`
+- `GET /api/media/:id`
 - `GET /api/profiles/:handle`
 - `GET /api/me/profile`
 - `PUT /api/me/profile`
@@ -94,6 +96,9 @@ Notes:
 - In local mobile-app manual QA mode (`AUTH_MODE=cognito`), use the dedicated non-prod Cognito pool and the `hidden_adventures_qa` database.
 - In production (`NODE_ENV=production`), the server fails fast unless `AUTH_MODE=cognito`.
 - `viewerHandle` is no longer part of the public request contract.
+- feed cards keep using `primaryMedia.id`; clients must not treat `storageKey` as a delivery URL.
+- `GET /api/adventures/:id/media` returns the ordered media references for detail carousels.
+- `GET /api/media/:id` is the authenticated byte-delivery route for feed and detail images and keeps S3 details server-side.
 - the current Slice 1 profile-write surface is limited to `GET /api/me/profile` and `PUT /api/me/profile`; handle creation remains on `POST /api/auth/handle`
 - no other Slice 1 API routes are currently locked or blessed for client integration
 

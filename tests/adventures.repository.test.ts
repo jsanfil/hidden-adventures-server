@@ -10,7 +10,12 @@ vi.mock("../src/db/client.js", () => ({
   db: dbMock
 }));
 
-import { getAdventureById, listFeed } from "../src/features/adventures/repository.js";
+import {
+  getAdventureById,
+  getMediaDeliveryTarget,
+  listAdventureMedia,
+  listFeed
+} from "../src/features/adventures/repository.js";
 
 describe("adventures repository", () => {
   beforeEach(() => {
@@ -102,6 +107,80 @@ describe("adventures repository", () => {
     expect(dbMock.query).toHaveBeenCalledWith(
       expect.stringContaining("select $1::uuid as id"),
       [null, "4b5edc1d-f292-45b4-8972-7b977ebf5298"]
+    );
+  });
+
+  it("returns ordered adventure media for a visible detail carousel", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [{ id: "adventure-1" }]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            media_id: "media-1",
+            sort_order: 0,
+            is_primary: true,
+            width: 1200,
+            height: 900
+          },
+          {
+            media_id: "media-2",
+            sort_order: 1,
+            is_primary: false,
+            width: 1024,
+            height: 768
+          }
+        ]
+      });
+
+    const result = await listAdventureMedia({
+      adventureId: "4b5edc1d-f292-45b4-8972-7b977ebf5298",
+      viewerId: "viewer-123"
+    });
+
+    expect(result).toEqual([
+      {
+        id: "media-1",
+        sortOrder: 0,
+        isPrimary: true,
+        width: 1200,
+        height: 900
+      },
+      {
+        id: "media-2",
+        sortOrder: 1,
+        isPrimary: false,
+        width: 1024,
+        height: 768
+      }
+    ]);
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("where adventures.id = $2::uuid"),
+      ["viewer-123", "4b5edc1d-f292-45b4-8972-7b977ebf5298"]
+    );
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("from public.adventure_media adventure_media"),
+      ["4b5edc1d-f292-45b4-8972-7b977ebf5298"]
+    );
+  });
+
+  it("returns null when media delivery target is not visible", async () => {
+    dbMock.query.mockResolvedValue({
+      rows: []
+    });
+
+    const result = await getMediaDeliveryTarget({
+      mediaId: "f2f81540-45c1-4a0d-a080-9df1b8b020c2",
+      viewerId: "viewer-123"
+    });
+
+    expect(result).toBeNull();
+    expect(dbMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("where media_assets.id = $2::uuid"),
+      ["viewer-123", "f2f81540-45c1-4a0d-a080-9df1b8b020c2"]
     );
   });
 });

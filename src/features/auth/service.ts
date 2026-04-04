@@ -78,7 +78,7 @@ function normalizeHandle(handle: string): string {
 }
 
 function suggestHandle(identity: AuthenticatedIdentity): string | null {
-  const candidates = [identity.username, identity.email?.split("@")[0] ?? null];
+  const candidates = [identity.email?.split("@")[0] ?? null, identity.username];
 
   for (const candidate of candidates) {
     if (!candidate) {

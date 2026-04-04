@@ -66,6 +66,38 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `updatedAt`
   - `placeLabel`
 
+### `GET /api/adventures/:id/media`
+
+- auth: required
+- params:
+  - `id`: UUID
+- any query param is rejected with `400`
+- response:
+  - `200` with `{ items }` when the adventure is visible to the caller
+  - `404` with `{ error: "Adventure not found." }` when missing or not visible
+- stable media item fields:
+  - `id`
+  - `sortOrder`
+  - `isPrimary`
+  - `width`
+  - `height`
+
+### `GET /api/media/:id`
+
+- auth: required
+- params:
+  - `id`: UUID
+- response:
+  - `200` with image bytes when the media belongs to a visible published adventure
+  - `304` when `If-None-Match` matches the current ETag
+  - `404` with `{ error: "Media not found." }` when missing or not visible
+  - `503` with `{ error: "Media delivery is unavailable." }` when S3 delivery is not configured
+- stable headers:
+  - `Content-Type`
+  - `Cache-Control`
+  - `ETag`
+  - `Content-Length`
+
 ### `GET /api/profiles/:handle`
 
 - auth: required
@@ -172,6 +204,8 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - All response objects use camelCase JSON keys.
 - Zod validation failures return `400` with `{ error: "Invalid request.", details: [{ path, message }] }`.
 - Media objects are either `null` or `{ id, storageKey }`.
+- `primaryMedia.id` is the stable feed-card media reference in Slice 1.
+- `primaryMedia.storageKey` may still appear in JSON payloads, but the client must not treat it as a delivery URL or construct S3 requests from it.
 - `location` is either `null` or `{ latitude, longitude }`.
 - `stats` is always present on adventure payloads. Missing database aggregates are normalized to zeroes.
 - `profile.email` is not exposed by `GET /api/profiles/:handle`.
@@ -182,6 +216,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 ## Intentional Non-Contract Items
 
 - No map-specific endpoint exists yet in this server repo.
+- Feed remains single-image in Slice 1 even though detail media is now ordered for future carousel work.
 - No favorites, comments, ratings, or connections-management write surface is part of this lock.
 - Postman request definitions are for manual smoke checks only and are not formal acceptance.
 

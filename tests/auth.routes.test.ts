@@ -149,6 +149,41 @@ describe("auth routes", () => {
     });
 
     expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "Handle must contain only letters, numbers, or underscores.",
+      details: [
+        {
+          path: "handle",
+          message: "Handle must contain only letters, numbers, or underscores."
+        }
+      ]
+    });
+    expect(completeHandleSelectionMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("returns a friendly length validation message for short handles", async () => {
+    const app = await buildAuthRouteApp(localIdentityFixtures.connected_viewer.identity);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/handle",
+      payload: {
+        handle: "ab"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "Handle must be 3 to 64 characters.",
+      details: [
+        {
+          path: "handle",
+          message: "Handle must be 3 to 64 characters."
+        }
+      ]
+    });
     expect(completeHandleSelectionMock).not.toHaveBeenCalled();
 
     await app.close();
@@ -206,7 +241,7 @@ describe("auth routes", () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toEqual({
-      error: "Handle unavailable."
+      error: "That handle is already taken. Try a different one."
     });
 
     await app.close();

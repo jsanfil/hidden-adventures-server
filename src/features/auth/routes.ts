@@ -12,10 +12,26 @@ const handleSelectionBodySchema = z.object({
   handle: z
     .string()
     .trim()
-    .min(3)
-    .max(64)
+    .min(3, "Handle must be 3 to 64 characters.")
+    .max(64, "Handle must be 3 to 64 characters.")
     .regex(/^[a-z0-9_]+$/i, "Handle must contain only letters, numbers, or underscores.")
 });
+
+function handleSelectionValidationMessage(error: z.ZodError): string {
+  for (const issue of error.issues) {
+    if (issue.path.join(".") !== "handle") {
+      continue;
+    }
+
+    if (issue.code === "too_small" || issue.code === "too_big") {
+      return "Handle must be 3 to 64 characters.";
+    }
+
+    return issue.message;
+  }
+
+  return "Enter a valid handle and try again.";
+}
 
 function requireAuthenticatedIdentity(request: FastifyRequest, reply: FastifyReply) {
   const identity = request.authContext?.identity;
@@ -47,14 +63,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply;
     }
 
-    const body = handleSelectionBodySchema.parse(request.body);
+    const parsedBody = handleSelectionBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.code(400).send({
+        error: handleSelectionValidationMessage(parsedBody.error),
+        details: parsedBody.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message
+        }))
+      });
+    }
 
     try {
-      return await completeHandleSelection(identity, body.handle);
+      return await completeHandleSelection(identity, parsedBody.data.handle);
     } catch (error) {
       if (error instanceof HandleUnavailableError) {
         return reply.code(409).send({
-          error: "Handle unavailable."
+          error: "That handle is already taken. Try a different one."
         });
       }
 

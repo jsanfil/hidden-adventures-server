@@ -4,14 +4,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { localIdentityFixtures } from "../src/features/auth/local-fixtures.js";
 
-const { getAdventureByIdMock, listFeedMock } = vi.hoisted(() => ({
+const { fetchMediaObjectMock, getAdventureByIdMock, getMediaDeliveryTargetMock, listAdventureMediaMock, listFeedMock } = vi.hoisted(() => ({
+  fetchMediaObjectMock: vi.fn(),
   getAdventureByIdMock: vi.fn(),
+  getMediaDeliveryTargetMock: vi.fn(),
+  listAdventureMediaMock: vi.fn(),
   listFeedMock: vi.fn()
 }));
 
 vi.mock("../src/features/adventures/repository.js", () => ({
   getAdventureById: getAdventureByIdMock,
+  getMediaDeliveryTarget: getMediaDeliveryTargetMock,
+  listAdventureMedia: listAdventureMediaMock,
   listFeed: listFeedMock
+}));
+
+vi.mock("../src/features/media/storage.js", () => ({
+  fetchMediaObject: fetchMediaObjectMock
+}));
+
+vi.mock("../src/config/env.js", () => ({
+  env: {
+    AWS_REGION: "us-west-2",
+    S3_BUCKET: "fixture-bucket"
+  }
 }));
 
 import { adventureRoutes } from "../src/features/adventures/routes.js";
@@ -47,6 +63,9 @@ describe("adventure routes", () => {
   beforeEach(() => {
     listFeedMock.mockReset();
     getAdventureByIdMock.mockReset();
+    listAdventureMediaMock.mockReset();
+    getMediaDeliveryTargetMock.mockReset();
+    fetchMediaObjectMock.mockReset();
   });
 
   it("requires auth for feed reads", async () => {
@@ -206,6 +225,85 @@ describe("adventure routes", () => {
     expect(detailResponse.statusCode).toBe(400);
     expect(listFeedMock).not.toHaveBeenCalled();
     expect(getAdventureByIdMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("returns ordered media items for visible adventures", async () => {
+    listAdventureMediaMock.mockResolvedValue([
+      {
+        id: "media-1",
+        sortOrder: 0,
+        isPrimary: true,
+        width: 1200,
+        height: 900
+      }
+    ]);
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/media"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listAdventureMediaMock).toHaveBeenCalledWith({
+      adventureId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id
+    });
+    expect(response.json()).toEqual({
+      items: [
+        {
+          id: "media-1",
+          sortOrder: 0,
+          isPrimary: true,
+          width: 1200,
+          height: 900
+        }
+      ]
+    });
+
+    await app.close();
+  });
+
+  it("streams media bytes for visible media ids", async () => {
+    getMediaDeliveryTargetMock.mockResolvedValue({
+      id: "media-1",
+      storageKey: "fixtures/test-core/adventures/fixture-falls.jpg",
+      mimeType: "image/jpeg",
+      byteSize: 12,
+      width: 1200,
+      height: 900,
+      updatedAt: "2026-03-03T00:00:00.000Z"
+    });
+    fetchMediaObjectMock.mockResolvedValue({
+      body: Buffer.from("hello world!"),
+      contentType: "image/jpeg",
+      contentLength: 12,
+      etag: '"media-1-etag"'
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/media/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(getMediaDeliveryTargetMock).toHaveBeenCalledWith({
+      mediaId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id
+    });
+    expect(fetchMediaObjectMock).toHaveBeenCalledWith({
+      bucket: "fixture-bucket",
+      key: "fixtures/test-core/adventures/fixture-falls.jpg",
+      region: "us-west-2"
+    });
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+    expect(response.headers.etag).toBe('"media-1-etag"');
+    expect(response.body).toBe("hello world!");
 
     await app.close();
   });

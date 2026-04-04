@@ -198,6 +198,28 @@ describe("auth service", () => {
     });
   });
 
+  it("prefers the email local part over the Cognito username for suggested handles", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await bootstrapAuthenticatedIdentity({
+      sub: "sub-2",
+      username: "fresh_user_abcd1234abcd1234abcd1234",
+      email: "fresh.person+qa@example.com",
+      emailVerified: true,
+      tokenUse: "id"
+    });
+
+    expect(result).toEqual({
+      accountState: "new_user_needs_handle",
+      user: null,
+      suggestedHandle: "fresh_person_qa",
+      recoveryEmail: "fresh.person+qa@example.com"
+    });
+  });
+
   it("creates a rebuild user with a normalized public handle", async () => {
     dbMock.query
       .mockResolvedValueOnce({ rows: [] })

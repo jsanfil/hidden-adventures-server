@@ -15,6 +15,10 @@ const { dbMock } = vi.hoisted(() => ({
   }
 }));
 
+const { fetchMediaObjectMock } = vi.hoisted(() => ({
+  fetchMediaObjectMock: vi.fn()
+}));
+
 vi.mock("../src/db/client.js", () => ({
   db: dbMock
 }));
@@ -25,8 +29,14 @@ vi.mock("../src/config/env.js", () => ({
     LOG_LEVEL: "info",
     AUTH_MODE: "local_identity",
     SERVER_RUNTIME_MODE: "local_automation_test_core",
-    POSTGRES_DB: "hidden_adventures_test"
+    POSTGRES_DB: "hidden_adventures_test",
+    AWS_REGION: "us-west-2",
+    S3_BUCKET: "fixture-bucket"
   }
+}));
+
+vi.mock("../src/features/media/storage.js", () => ({
+  fetchMediaObject: fetchMediaObjectMock
 }));
 
 import { buildApp } from "../src/app.js";
@@ -105,6 +115,7 @@ describe("buildApp", () => {
     dbMock.checkHealth.mockReset();
     dbMock.close.mockReset();
     dbMock.withTransaction.mockReset();
+    fetchMediaObjectMock.mockReset();
 
     dbMock.withTransaction.mockImplementation(async (callback) => callback({ query: dbMock.query }));
   });
@@ -355,6 +366,91 @@ describe("buildApp", () => {
     expect(response.json()).toEqual({
       error: "Adventure not found."
     });
+
+    await app.close();
+  });
+
+  it("returns ordered adventure media for visible detail screens", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [{ id: "adventure-1" }]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            media_id: "media-1",
+            sort_order: 0,
+            is_primary: true,
+            width: 1200,
+            height: 900
+          }
+        ]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/media",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        {
+          id: "media-1",
+          sortOrder: 0,
+          isPrimary: true,
+          width: 1200,
+          height: 900
+        }
+      ]
+    });
+
+    await app.close();
+  });
+
+  it("returns authenticated media bytes for visible feed and detail cards", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            media_id: "media-1",
+            storage_key: "adventures/media-1.jpg",
+            mime_type: "image/jpeg",
+            byte_size: 12,
+            width: 1200,
+            height: 900,
+            updated_at: "2026-03-03T00:00:00.000Z"
+          }
+        ]
+      } as QueryRows<Record<string, unknown>>);
+    fetchMediaObjectMock.mockResolvedValue({
+      body: Buffer.from("hello world!"),
+      contentType: "image/jpeg",
+      contentLength: 12,
+      etag: '"media-1-etag"'
+    });
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/media/5c6d39fe-86e0-4c90-b143-4f44d8c32197",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+    expect(response.headers.etag).toBe('"media-1-etag"');
+    expect(response.body).toBe("hello world!");
 
     await app.close();
   });
