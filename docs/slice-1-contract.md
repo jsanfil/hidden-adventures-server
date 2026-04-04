@@ -170,6 +170,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 ## Payload Assumptions The iOS Thread May Rely On
 
 - All response objects use camelCase JSON keys.
+- Zod validation failures return `400` with `{ error: "Invalid request.", details: [{ path, message }] }`.
 - Media objects are either `null` or `{ id, storageKey }`.
 - `location` is either `null` or `{ latitude, longitude }`.
 - `stats` is always present on adventure payloads. Missing database aggregates are normalized to zeroes.
