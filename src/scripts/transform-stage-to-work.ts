@@ -4,6 +4,7 @@ import path from "node:path";
 import type { PoolClient } from "pg";
 
 import { db } from "../db/client.js";
+import { normalizeAdventureCategorySlug } from "../features/adventures/category-taxonomy.js";
 import {
   appendImportAudit,
   coerceTimestamp,
@@ -11,6 +12,10 @@ import {
   nullableString,
   stableUuid
 } from "./lib/migration-work.js";
+import {
+  excludedLegacyProfileReason,
+  shouldExcludeLegacyProfileHandle
+} from "./lib/legacy-profile-exclusions.js";
 
 type CliOptions = {
   runId: number;
@@ -133,26 +138,6 @@ type TransformSummary = {
   skippedFavorites: number;
   skippedComments: number;
 };
-
-const categoryMap = new Map<string, string>([
-  ["Abandoned", "abandoned"],
-  ["Bar", "bar"],
-  ["Beach_Cove", "beach-cove"],
-  ["Bridge", "bridge"],
-  ["Cafe", "cafe"],
-  ["Cave", "cave"],
-  ["Creek_Rivers", "creek-river"],
-  ["Desert", "desert"],
-  ["Fishing", "fishing"],
-  ["Forest", "forest"],
-  ["LiveMusic", "live-music"],
-  ["Restaurant", "restaurant"],
-  ["RopeSwing", "rope-swing"],
-  ["SwimmingHole", "swimming-hole"],
-  ["Trail", "trail"],
-  ["Viewpoint", "viewpoint"],
-  ["road", "roadside-stop"]
-]);
 
 const visibilityMap = new Map<string, string>([
   ["Private", "private"],
@@ -340,14 +325,6 @@ function normalizeVisibility(value: string | null): string {
   return visibilityMap.get(value ?? "") ?? "private";
 }
 
-function normalizeCategory(value: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-
-  return categoryMap.get(value) ?? "other";
-}
-
 function extractCoordinates(location: AdventureLocation | undefined): {
   longitude: number | null;
   latitude: number | null;
@@ -401,6 +378,20 @@ async function importProfiles(
         row.source_key,
         "skipped_profile",
         "Profile row is missing username.",
+        profile
+      );
+      continue;
+    }
+
+    if (shouldExcludeLegacyProfileHandle(handle)) {
+      summary.skippedProfiles += 1;
+      await appendImportAudit(
+        client,
+        runId,
+        "profiles",
+        row.source_key,
+        "excluded_profile",
+        excludedLegacyProfileReason,
         profile
       );
       continue;
@@ -606,6 +597,22 @@ async function importAdventures(
     const { longitude, latitude } = extractCoordinates(adventure.location);
     const body = nullableString(adventure.desc);
     const defaultImageKey = nullableString(adventure.defaultImage);
+    const sourceCategory = nullableString(adventure.category);
+    const normalizedCategory = normalizeAdventureCategorySlug(sourceCategory);
+
+    if (sourceCategory && !normalizedCategory) {
+      summary.skippedAdventures += 1;
+      await appendImportAudit(
+        client,
+        runId,
+        "adventures",
+        legacyAdventureId,
+        "quarantined_adventure",
+        `Adventure category "${sourceCategory}" is not part of the locked category taxonomy.`,
+        adventure
+      );
+      continue;
+    }
 
     await client.query(
       `
@@ -657,7 +664,7 @@ async function importAdventures(
         nullableString(adventure.name) ?? "Untitled Adventure",
         body,
         buildSummaryText(body),
-        normalizeCategory(nullableString(adventure.category)),
+        normalizedCategory,
         normalizeVisibility(nullableString(adventure.access)),
         longitude,
         latitude,

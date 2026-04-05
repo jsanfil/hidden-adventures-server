@@ -40,6 +40,7 @@
     "test:regression": "npm run db:migrate:test && npm run fixtures:validate:test -- --pack test-core && npm run fixtures:seed-db:test -- --pack test-core && npm test",
     "test:regression:clean": "npm run db:reset:test && npm run db:migrate:test && npm run fixtures:validate:test -- --pack test-core && npm run fixtures:seed-db:test -- --pack test-core && npm test",
     "auth:sync-cognito": "tsx src/scripts/sync-cognito-users.ts",
+    "migration:export-cognito": "tsx src/scripts/export-cognito-users.ts",
     "migration:stage-archive": "tsx src/scripts/stage-mongo-archive.ts",
     "migration:transform-stage": "tsx src/scripts/transform-stage-to-work.ts",
     "migration:publish-run": "tsx src/scripts/publish-run.ts",

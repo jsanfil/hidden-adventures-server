@@ -165,6 +165,14 @@ Stage the legacy Mongo archive into the raw migration tables:
 
 - `POSTGRES_HOST=127.0.0.1 npm run migration:stage-archive -- --archive ../hidden-adventures-plan/migration/archives/legacy-mongodb-backup-2026-03-01.archive --report /tmp/ha-stage-report.json`
 
+Export the original Cognito pool into a local timestamped JSON artifact outside git:
+
+- `npm run migration:export-cognito`
+
+The export is written to:
+
+- `~/.hidden-adventures/backups/cognito/cognito-users-<pool-id>-<timestamp>.json`
+
 Transform staged raw rows into normalized work tables:
 
 - `POSTGRES_HOST=127.0.0.1 npm run migration:transform-stage -- --run-id 2 --report /tmp/ha-transform-report.json`
@@ -181,6 +189,7 @@ Notes:
 
 - the archive staging job creates a new `migration_meta.import_runs` row, loads the raw collection payloads into `migration_stage`, and records collection counts in `migration_meta.import_metrics`
 - the transform job currently covers `profiles_raw`, `adventures_raw`, `sidekicks_raw`, `favorites_raw`, and `comments_raw` into the corresponding `migration_work` tables plus import audit rows for skipped or collapsed legacy records
+- the transform job intentionally excludes the 29 historically-approved zero-activity duplicate legacy profiles and records them as `profiles.excluded_profile`
 - the publish job currently replaces the data in the `public` application tables from a chosen migration run and writes a reconciliation report comparing work-table counts to published counts
 - the linking job expects a Cognito export JSON shaped either as an array of users or an object with a `Users` array
 - dry-run is the default; add `--apply` to persist `cognito_subject` links and audit rows
@@ -189,3 +198,28 @@ Notes:
 - read endpoints now resolve the viewer from the authenticated bearer token and use local `users.id` for visibility decisions
 - `handle` is the public username shown in the app and used for profile lookup; it is not the authenticated identity key
 - `displayName` is the optional friendly profile label and can differ from `handle`
+
+### Trusted local rebuild sequence
+
+When rebuilding the canonical local `hidden_adventures` database from scratch:
+
+1. `npm run db:backup:local`
+2. `npm run migration:export-cognito`
+3. `POSTGRES_HOST=127.0.0.1 node --env-file=.env --import tsx ./src/scripts/db-reset-local-database.ts`
+4. `POSTGRES_HOST=127.0.0.1 node --env-file=.env --import tsx ./src/scripts/run-migrations.ts`
+5. `POSTGRES_HOST=127.0.0.1 npm run migration:stage-archive -- --archive ../hidden-adventures-plan/migration/archives/legacy-mongodb-backup-2026-03-01.archive --report /tmp/ha-stage-report.json`
+6. `POSTGRES_HOST=127.0.0.1 npm run migration:transform-stage -- --run-id <RUN_ID> --report /tmp/ha-transform-report.json`
+7. `POSTGRES_HOST=127.0.0.1 npm run migration:link-cognito -- --input ~/.hidden-adventures/backups/cognito/cognito-users-<pool-id>-<timestamp>.json --run-id <RUN_ID> --apply --report /tmp/ha-cognito-link-report.json`
+8. `POSTGRES_HOST=127.0.0.1 npm run migration:publish-run -- --run-id <RUN_ID> --report /tmp/ha-publish-report.json`
+
+Expected published counts after the canonical rebuild:
+
+- `users`: `2598`
+- `profiles`: `2598`
+- `adventures`: `352`
+- `connections`: `1004`
+- `adventure_favorites`: `1869`
+- `adventure_comments`: `140`
+- `media_assets`: `1839`
+- `adventure_media`: `352`
+- `adventure_stats`: `352`

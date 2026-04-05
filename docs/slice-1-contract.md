@@ -37,6 +37,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `summary`
   - `body`
   - `categorySlug`
+    - allowed values: `viewpoints`, `trails`, `water_spots`, `food_drink`, `abandoned_places`, `caves`, `nature_escapes`, `roadside_stops`
   - `visibility`
   - `createdAt`
   - `publishedAt`

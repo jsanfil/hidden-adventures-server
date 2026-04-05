@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
+import { canonicalCategorySlugs } from "../adventures/category-taxonomy.js";
 import { stableUuid } from "../../scripts/lib/stable-uuid.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -63,7 +64,7 @@ const AdventureSchema = z.object({
   title: z.string().min(1),
   summary: z.string().min(1),
   body: z.string().min(1),
-  categorySlug: z.string().min(1),
+  categorySlug: z.enum(canonicalCategorySlugs),
   visibility: z.enum(["public", "connections", "private"]),
   status: z.enum(["published", "draft", "archived"]).default("published"),
   longitude: z.number().optional(),
