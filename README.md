@@ -20,6 +20,7 @@ TypeScript backend for the Hidden Adventures rebuild.
 4. Migrate the local databases:
    - `npm run db:migrate:qa`
    - `npm run db:migrate:test`
+   - after this adventure-description refactor lands, reset and recreate any already-migrated local DB before rerunning migrations
 5. Choose a local mode:
    - mobile app manual QA backend prep: `npm run fixtures:validate -- --pack qa-rich`, `npm run fixtures:verify-media -- --pack qa-rich`, `npm run fixtures:provision-cognito -- --pack qa-rich`, `npm run fixtures:seed-db -- --pack qa-rich`, then `npm run dev:manual-qa`
    - automated server regression: `npm run test:regression`
@@ -121,6 +122,7 @@ Notes:
 
 1. Start Docker and Postgres with `docker compose up --build`.
 2. Create and migrate the QA database with `npm run db:create:qa` and `npm run db:migrate:qa`.
+   If the DB was already migrated before this refactor, run `npm run db:reset:qa` first so the rewritten base migrations apply cleanly.
 3. Validate and verify the fixture pack:
    - `npm run fixtures:validate -- --pack qa-rich`
    - `npm run fixtures:verify-media -- --pack qa-rich`
@@ -138,6 +140,7 @@ This workflow prepares a realistic backend for manual mobile-app testing. It is 
 
 1. Run `npm run test:regression` for the normal edit and test loop.
 2. Run `npm run test:regression:clean` when you want a full database rebuild before tests.
+   After the base-migration rewrite for adventure descriptions, prefer the clean path until your local test DB has been rebuilt once.
 3. Use `npm run dev:automation` only when you want to point another client or harness at the local automation server outside the Vitest flow.
 
 ## Current Data And Identity Snapshot

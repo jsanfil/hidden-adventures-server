@@ -5,8 +5,7 @@ import { db } from "../../db/client.js";
 type AdventureFeedRow = QueryResultRow & {
   id: string;
   title: string;
-  summary: string | null;
-  body: string | null;
+  description: string | null;
   category_slug: string | null;
   visibility: string;
   created_at: string;
@@ -28,8 +27,7 @@ type AdventureFeedRow = QueryResultRow & {
 export type AdventureCard = {
   id: string;
   title: string;
-  summary: string | null;
-  body: string | null;
+  description: string | null;
   categorySlug: string | null;
   visibility: string;
   createdAt: string;
@@ -101,8 +99,7 @@ function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
   return {
     id: row.id,
     title: row.title,
-    summary: row.summary,
-    body: row.body,
+    description: row.description,
     categorySlug: row.category_slug,
     visibility: row.visibility,
     createdAt: row.created_at,
@@ -167,8 +164,7 @@ const feedSelect = `
   select
     adventures.id::text as id,
     adventures.title,
-    adventures.summary,
-    adventures.body,
+    adventures.description,
     adventures.category_slug,
     adventures.visibility::text as visibility,
     adventures.created_at::text as created_at,

@@ -28,8 +28,7 @@ describe("adventures repository", () => {
         {
           id: "adventure-1",
           title: "Quiet Ridge",
-          summary: null,
-          body: null,
+          description: null,
           category_slug: "viewpoints",
           visibility: "public",
           created_at: "2026-03-01T00:00:00.000Z",
@@ -60,8 +59,7 @@ describe("adventures repository", () => {
       {
         id: "adventure-1",
         title: "Quiet Ridge",
-        summary: null,
-        body: null,
+        description: null,
         categorySlug: "viewpoints",
         visibility: "public",
         createdAt: "2026-03-01T00:00:00.000Z",

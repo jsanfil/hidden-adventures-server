@@ -90,8 +90,7 @@ describe("adventure routes", () => {
       {
         id: "adventure-1",
         title: "Hidden Falls",
-        summary: "A short trail to a quiet waterfall.",
-        body: "Bring water and wear good shoes.",
+        description: "Bring water and wear good shoes.",
         categorySlug: "water_spots",
         visibility: "public",
         createdAt: "2026-03-01T00:00:00.000Z",
@@ -150,8 +149,7 @@ describe("adventure routes", () => {
     getAdventureByIdMock.mockResolvedValue({
       id: "adventure-1",
       title: "Hidden Falls",
-      summary: "A short trail to a quiet waterfall.",
-      body: "Bring water and wear good shoes.",
+      description: "Bring water and wear good shoes.",
       categorySlug: "water_spots",
       visibility: "public",
       createdAt: "2026-03-01T00:00:00.000Z",

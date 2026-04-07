@@ -343,19 +343,6 @@ function extractCoordinates(location: AdventureLocation | undefined): {
   return { longitude, latitude };
 }
 
-function buildSummaryText(description: string | null): string | null {
-  if (!description) {
-    return null;
-  }
-
-  const normalized = description.trim().replace(/\s+/g, " ");
-  if (normalized.length <= 140) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, 137).trimEnd()}...`;
-}
-
 async function importProfiles(
   client: PoolClient,
   runId: number,
@@ -595,7 +582,7 @@ async function importAdventures(
     const updatedAt = coerceTimestamp(adventure.updatedAt, new Date(createdAt));
     const adventureId = stableUuid(`legacy_adventure:${legacyAdventureId}`);
     const { longitude, latitude } = extractCoordinates(adventure.location);
-    const body = nullableString(adventure.desc);
+    const description = nullableString(adventure.desc);
     const defaultImageKey = nullableString(adventure.defaultImage);
     const sourceCategory = nullableString(adventure.category);
     const normalizedCategory = normalizeAdventureCategorySlug(sourceCategory);
@@ -622,8 +609,7 @@ async function importAdventures(
           legacy_adventure_id,
           author_user_id,
           title,
-          body,
-          summary,
+          description,
           category_slug,
           visibility,
           status,
@@ -644,16 +630,15 @@ async function importAdventures(
           $6,
           $7,
           $8,
-          $9,
           'published',
+          $9,
           $10,
           $11,
           $12,
           $13,
-          $14,
+          $14::timestamptz,
           $15::timestamptz,
-          $16::timestamptz,
-          $17::timestamptz
+          $16::timestamptz
         )
       `,
       [
@@ -662,8 +647,7 @@ async function importAdventures(
         legacyAdventureId,
         author.userId,
         nullableString(adventure.name) ?? "Untitled Adventure",
-        body,
-        buildSummaryText(body),
+        description,
         normalizedCategory,
         normalizeVisibility(nullableString(adventure.access)),
         longitude,

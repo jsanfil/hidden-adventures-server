@@ -284,8 +284,7 @@ async function seedAdventures(client: PoolClient, pack: FixturePack) {
           id,
           author_user_id,
           title,
-          summary,
-          body,
+          description,
           category_slug,
           visibility,
           status,
@@ -301,17 +300,16 @@ async function seedAdventures(client: PoolClient, pack: FixturePack) {
           $3,
           $4,
           $5,
-          $6,
-          $7::public.adventure_visibility,
-          $8::public.adventure_status,
+          $6::public.adventure_visibility,
+          $7::public.adventure_status,
           case
-            when $9::double precision is null or $10::double precision is null then null
-            else ST_SetSRID(ST_MakePoint($9, $10), 4326)::geography
+            when $8::double precision is null or $9::double precision is null then null
+            else ST_SetSRID(ST_MakePoint($8, $9), 4326)::geography
           end,
-          $11,
+          $10,
+          $11::timestamptz,
           $12::timestamptz,
           $13::timestamptz,
-          $14::timestamptz,
           null
         )
       `,
@@ -319,8 +317,7 @@ async function seedAdventures(client: PoolClient, pack: FixturePack) {
         fixtureAdventureId(pack, adventure.key),
         fixtureUserId(pack, adventure.authorPersonaKey),
         adventure.title,
-        adventure.summary,
-        adventure.body,
+        adventure.description,
         adventure.categorySlug,
         adventure.visibility,
         adventure.status,

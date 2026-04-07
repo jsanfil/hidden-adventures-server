@@ -67,8 +67,7 @@ function makeAdventureRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "adventure-1",
     title: "Hidden Falls",
-    summary: "A short trail to a quiet waterfall.",
-    body: "Bring water and wear good shoes.",
+    description: "Bring water and wear good shoes.",
     category_slug: "water_spots",
     visibility: "public",
     created_at: "2026-03-01T00:00:00.000Z",
@@ -215,8 +214,7 @@ describe("buildApp", () => {
         {
           id: "adventure-1",
           title: "Hidden Falls",
-          summary: "A short trail to a quiet waterfall.",
-          body: "Bring water and wear good shoes.",
+          description: "Bring water and wear good shoes.",
           categorySlug: "water_spots",
           visibility: "public",
           createdAt: "2026-03-01T00:00:00.000Z",
@@ -312,8 +310,7 @@ describe("buildApp", () => {
       item: {
         id: "adventure-1",
         title: "Hidden Falls",
-        summary: "A short trail to a quiet waterfall.",
-        body: "Bring water and wear good shoes.",
+        description: "Bring water and wear good shoes.",
         categorySlug: "water_spots",
         visibility: "public",
         createdAt: "2026-03-01T00:00:00.000Z",
@@ -502,8 +499,7 @@ describe("buildApp", () => {
         {
           id: "adventure-1",
           title: "Hidden Falls",
-          summary: "A short trail to a quiet waterfall.",
-          body: "Bring water and wear good shoes.",
+          description: "Bring water and wear good shoes.",
           categorySlug: "water_spots",
           visibility: "public",
           createdAt: "2026-03-01T00:00:00.000Z",

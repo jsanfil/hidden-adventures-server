@@ -46,6 +46,17 @@ type CliOptions = {
   reportPath?: string;
 };
 
+function actionPriority(action: LinkAction): number {
+  switch (action) {
+    case "linked_by_username":
+      return 0;
+    case "linked_by_unique_email":
+      return 1;
+    case "manual_review_required":
+      return 2;
+  }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -300,18 +311,22 @@ async function run() {
     }
 
     const report: LinkReportEntry[] = [];
-    let persistedAuditRows = 0;
-    let persistedUserLinks = 0;
     for (const user of users) {
       const entry = buildLinkEntry(user, usersByHandle, usersByEmail);
       report.push(entry);
+    }
 
-      if (!options.apply) {
-        continue;
+    let persistedAuditRows = 0;
+    let persistedUserLinks = 0;
+    const entriesToPersist = [...report].sort(
+      (left, right) => actionPriority(left.action) - actionPriority(right.action)
+    );
+
+    if (options.apply) {
+      for (const entry of entriesToPersist) {
+        persistedAuditRows += await appendAuditRow(client, options.runId, entry);
+        persistedUserLinks += await updateLinkedUser(client, options.runId, entry);
       }
-
-      persistedAuditRows += await appendAuditRow(client, options.runId, entry);
-      persistedUserLinks += await updateLinkedUser(client, options.runId, entry);
     }
 
     if (options.reportPath) {
@@ -322,12 +337,16 @@ async function run() {
     const linkedByUsername = report.filter((entry) => entry.action === "linked_by_username").length;
     const linkedByUniqueEmail = report.filter((entry) => entry.action === "linked_by_unique_email").length;
     const manualReviewRequired = report.filter((entry) => entry.action === "manual_review_required").length;
-    const expectedPersistedLinks = report.filter(
-      (entry) =>
-        entry.action !== "manual_review_required" &&
-        Boolean(entry.matchedUserId) &&
-        Boolean(entry.cognitoSub)
-    ).length;
+    const expectedPersistedLinks = new Set(
+      report
+        .filter(
+          (entry) =>
+            entry.action !== "manual_review_required" &&
+            Boolean(entry.matchedUserId) &&
+            Boolean(entry.cognitoSub)
+        )
+        .map((entry) => entry.matchedUserId)
+    ).size;
 
     if (options.apply && persistedUserLinks !== expectedPersistedLinks) {
       throw new Error(

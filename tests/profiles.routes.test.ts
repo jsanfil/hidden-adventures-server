@@ -98,8 +98,7 @@ describe("profile routes", () => {
       {
         id: "adventure-1",
         title: "Quiet Ridge",
-        summary: "Best at sunset.",
-        body: null,
+        description: "Best at sunset.",
         categorySlug: "viewpoints",
         visibility: "public",
         createdAt: "2026-03-01T00:00:00.000Z",

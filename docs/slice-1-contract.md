@@ -34,8 +34,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - stable feed item fields:
   - `id`
   - `title`
-  - `summary`
-  - `body`
+  - `description`
   - `categorySlug`
     - allowed values: `viewpoints`, `trails`, `water_spots`, `food_drink`, `abandoned_places`, `caves`, `nature_escapes`, `roadside_stops`
   - `visibility`

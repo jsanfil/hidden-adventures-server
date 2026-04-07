@@ -23,8 +23,7 @@ type ProfileRow = QueryResultRow & {
 type ProfileAdventureRow = QueryResultRow & {
   id: string;
   title: string;
-  summary: string | null;
-  body: string | null;
+  description: string | null;
   category_slug: string | null;
   visibility: string;
   created_at: string;
@@ -121,8 +120,7 @@ function mapProfileAdventure(row: ProfileAdventureRow, author: ProfileDetail): A
   return {
     id: row.id,
     title: row.title,
-    summary: row.summary,
-    body: row.body,
+    description: row.description,
     categorySlug: row.category_slug,
     visibility: row.visibility,
     createdAt: row.created_at,
@@ -324,8 +322,7 @@ export async function listProfileAdventures(options: {
       select
         adventures.id::text as id,
         adventures.title,
-        adventures.summary,
-        adventures.body,
+        adventures.description,
         adventures.category_slug,
         adventures.visibility::text as visibility,
         adventures.created_at::text as created_at,
