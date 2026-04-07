@@ -22,6 +22,7 @@ type AdventureFeedRow = QueryResultRow & {
   comment_count: number | null;
   rating_count: number | null;
   average_rating: number | null;
+  place_label: string | null;
 };
 
 export type AdventureCard = {
@@ -36,6 +37,7 @@ export type AdventureCard = {
     latitude: number;
     longitude: number;
   } | null;
+  placeLabel: string | null;
   author: {
     handle: string;
     displayName: string | null;
@@ -111,6 +113,7 @@ function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
             longitude: row.longitude
           }
         : null,
+    placeLabel: row.place_label,
     author: {
       handle: row.author_handle,
       displayName: row.author_display_name,
@@ -180,7 +183,8 @@ const feedSelect = `
     adventure_stats.favorite_count,
     adventure_stats.comment_count,
     adventure_stats.rating_count,
-    adventure_stats.average_rating
+    adventure_stats.average_rating,
+    adventures.place_label
 `;
 
 const feedJoins = `
@@ -232,7 +236,6 @@ export async function getAdventureById(options: {
         select $1::uuid as id
       )
       ${feedSelect},
-      adventures.place_label,
       adventures.updated_at::text as updated_at
       ${feedJoins}
       where adventures.id = $2::uuid

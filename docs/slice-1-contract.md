@@ -41,6 +41,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `createdAt`
   - `publishedAt`
   - `location`
+  - `placeLabel`
   - `author.handle`
   - `author.displayName`
   - `author.homeCity`

@@ -44,7 +44,8 @@ describe("adventures repository", () => {
           favorite_count: null,
           comment_count: null,
           rating_count: null,
-          average_rating: null
+          average_rating: null,
+          place_label: null
         }
       ]
     });
@@ -65,6 +66,7 @@ describe("adventures repository", () => {
         createdAt: "2026-03-01T00:00:00.000Z",
         publishedAt: null,
         location: null,
+        placeLabel: null,
         author: {
           handle: "jacksanfil",
           displayName: null,

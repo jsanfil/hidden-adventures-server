@@ -223,6 +223,7 @@ describe("buildApp", () => {
             latitude: 34.12,
             longitude: -118.45
           },
+          placeLabel: "Hidden Falls Trailhead",
           author: {
             handle: localFixtureContent.profileHandle,
             displayName: "Fixture Author",
