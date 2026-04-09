@@ -2,14 +2,16 @@ import Fastify from "fastify";
 import { ZodError } from "zod";
 
 import { env } from "./config/env.js";
+import { createLoggerOptions } from "./config/logger.js";
 import { db } from "./db/client.js";
 import { registerRoutes } from "./routes/index.js";
 
 export async function buildApp() {
   const app = Fastify({
-    logger: {
-      level: env.LOG_LEVEL
-    }
+    logger: createLoggerOptions({
+      level: env.LOG_LEVEL,
+      runtimeMode: env.SERVER_RUNTIME_MODE
+    })
   });
 
   app.setErrorHandler((error, _request, reply) => {
