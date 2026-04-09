@@ -1,4 +1,6 @@
-import type { QueryResultRow } from "pg";
+import { randomUUID } from "node:crypto";
+
+import type { PoolClient, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
 
@@ -95,6 +97,32 @@ export type MediaDeliveryTarget = {
   width: number | null;
   height: number | null;
   updatedAt: string;
+};
+
+export type AdventureCreateMediaInput = {
+  mediaId: string;
+  sortOrder: number;
+  isPrimary: boolean;
+};
+
+export type AdventureCreateInput = {
+  authorUserId: string;
+  title: string;
+  description: string | null;
+  categorySlug: string | null;
+  visibility: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  } | null;
+  placeLabel: string | null;
+  media: AdventureCreateMediaInput[];
+  status?: "pending_moderation" | "published";
+};
+
+export type CreatedAdventure = {
+  id: string;
+  status: string;
 };
 
 function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
@@ -353,5 +381,91 @@ export async function getMediaDeliveryTarget(options: {
     width: row.width,
     height: row.height,
     updatedAt: row.updated_at
+  };
+}
+
+export async function createAdventure(
+  input: AdventureCreateInput,
+  client: PoolClient
+): Promise<CreatedAdventure> {
+  const adventureId = randomUUID();
+  const adventureStatus = input.status ?? "pending_moderation";
+
+  const adventureResult = await client.query<QueryResultRow & { id: string; status: string }>(
+    `
+      insert into public.adventures (
+        id,
+        author_user_id,
+        title,
+        description,
+        category_slug,
+        visibility,
+        status,
+        location,
+        place_label,
+        created_at,
+        updated_at,
+        published_at,
+        archived_at
+      ) values (
+        $1::uuid,
+        $2::uuid,
+        $3,
+        $4,
+        $5,
+        $6::public.adventure_visibility,
+        $7::public.adventure_status,
+        case
+          when $8::double precision is null or $9::double precision is null then null
+          else st_setsrid(st_makepoint($8::double precision, $9::double precision), 4326)::geography
+        end,
+        $10,
+        now(),
+        now(),
+        case when $7::public.adventure_status = 'published' then now() else null end,
+        null
+      )
+      returning
+        id::text as id,
+        status::text as status
+    `,
+    [
+      adventureId,
+      input.authorUserId,
+      input.title,
+      input.description,
+      input.categorySlug,
+      input.visibility,
+      adventureStatus,
+      input.location?.longitude ?? null,
+      input.location?.latitude ?? null,
+      input.placeLabel
+    ]
+  );
+
+  for (const item of input.media) {
+    await client.query(
+      `
+        insert into public.adventure_media (
+          adventure_id,
+          media_asset_id,
+          sort_order,
+          is_primary,
+          created_at
+        ) values (
+          $1::uuid,
+          $2::uuid,
+          $3,
+          $4,
+          now()
+        )
+      `,
+      [adventureId, item.mediaId, item.sortOrder, item.isPrimary]
+    );
+  }
+
+  return {
+    id: adventureResult.rows[0]!.id,
+    status: adventureResult.rows[0]!.status
   };
 }

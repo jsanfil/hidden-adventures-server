@@ -4,22 +4,50 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { localIdentityFixtures } from "../src/features/auth/local-fixtures.js";
 
-const { fetchMediaObjectMock, getAdventureByIdMock, getMediaDeliveryTargetMock, listAdventureMediaMock, listFeedMock } = vi.hoisted(() => ({
+const {
+  dbMock,
+  checkMediaObjectExistsMock,
+  fetchMediaObjectMock,
+  createAdventureMock,
+  getAdventureByIdMock,
+  getMediaDeliveryTargetMock,
+  listAdventureMediaMock,
+  listFeedMock
+} = vi.hoisted(() => ({
+  dbMock: {
+    withTransaction: vi.fn()
+  },
+  checkMediaObjectExistsMock: vi.fn(),
   fetchMediaObjectMock: vi.fn(),
+  createAdventureMock: vi.fn(),
   getAdventureByIdMock: vi.fn(),
   getMediaDeliveryTargetMock: vi.fn(),
   listAdventureMediaMock: vi.fn(),
   listFeedMock: vi.fn()
 }));
 
+vi.mock("../src/db/client.js", () => ({
+  db: dbMock
+}));
+
+const { listOwnedMediaAssetsForAdventureCreateMock } = vi.hoisted(() => ({
+  listOwnedMediaAssetsForAdventureCreateMock: vi.fn()
+}));
+
 vi.mock("../src/features/adventures/repository.js", () => ({
+  createAdventure: createAdventureMock,
   getAdventureById: getAdventureByIdMock,
   getMediaDeliveryTarget: getMediaDeliveryTargetMock,
   listAdventureMedia: listAdventureMediaMock,
   listFeed: listFeedMock
 }));
 
+vi.mock("../src/features/media/repository.js", () => ({
+  listOwnedMediaAssetsForAdventureCreate: listOwnedMediaAssetsForAdventureCreateMock
+}));
+
 vi.mock("../src/features/media/storage.js", () => ({
+  checkMediaObjectExists: checkMediaObjectExistsMock,
   fetchMediaObject: fetchMediaObjectMock
 }));
 
@@ -61,10 +89,17 @@ async function buildAdventureRouteApp(viewerId?: string) {
 
 describe("adventure routes", () => {
   beforeEach(() => {
+    dbMock.withTransaction.mockReset();
+    dbMock.withTransaction.mockImplementation(async (callback: (client: { query: typeof vi.fn }) => unknown) =>
+      callback({ query: vi.fn() })
+    );
     listFeedMock.mockReset();
+    createAdventureMock.mockReset();
     getAdventureByIdMock.mockReset();
     listAdventureMediaMock.mockReset();
     getMediaDeliveryTargetMock.mockReset();
+    listOwnedMediaAssetsForAdventureCreateMock.mockReset();
+    checkMediaObjectExistsMock.mockReset();
     fetchMediaObjectMock.mockReset();
   });
 
@@ -303,6 +338,112 @@ describe("adventure routes", () => {
     expect(response.headers["content-type"]).toContain("image/jpeg");
     expect(response.headers.etag).toBe('"media-1-etag"');
     expect(response.body).toBe("hello world!");
+
+    await app.close();
+  });
+
+  it("creates an adventure from uploaded media", async () => {
+    listOwnedMediaAssetsForAdventureCreateMock.mockResolvedValue([
+      {
+        id: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+        storageKey: "adventures/fixture_author_media-1.jpg",
+        mimeType: "image/jpeg",
+        byteSize: 123,
+        width: 1200,
+        height: 900,
+        alreadyAttached: false
+      }
+    ]);
+    checkMediaObjectExistsMock.mockResolvedValue(true);
+    createAdventureMock.mockResolvedValue({
+      id: "adventure-1",
+      status: "pending_moderation"
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures",
+      payload: {
+        title: "Hidden Falls",
+        description: "Bring water and wear good shoes.",
+        categorySlug: "water_spots",
+        visibility: "public",
+        location: {
+          latitude: 34.12,
+          longitude: -118.45
+        },
+        placeLabel: "Hidden Falls Trailhead",
+        media: [
+          {
+            mediaId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+            sortOrder: 0,
+            isPrimary: true
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(listOwnedMediaAssetsForAdventureCreateMock).toHaveBeenCalledWith({
+      ownerUserId: localIdentityFixtures.connected_viewer.seededUser?.id,
+      mediaIds: ["3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"]
+    });
+    expect(createAdventureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authorUserId: localIdentityFixtures.connected_viewer.seededUser?.id,
+        status: "pending_moderation"
+      }),
+      expect.anything()
+    );
+    expect(response.json()).toEqual({
+      item: {
+        id: "adventure-1",
+        status: "pending_moderation"
+      }
+    });
+
+    await app.close();
+  });
+
+  it("rejects missing uploaded media before creation", async () => {
+    listOwnedMediaAssetsForAdventureCreateMock.mockResolvedValue([
+      {
+        id: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+        storageKey: "adventures/fixture_author_media-1.jpg",
+        mimeType: "image/jpeg",
+        byteSize: 123,
+        width: 1200,
+        height: 900,
+        alreadyAttached: false
+      }
+    ]);
+    checkMediaObjectExistsMock.mockResolvedValue(false);
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures",
+      payload: {
+        title: "Hidden Falls",
+        visibility: "public",
+        media: [
+          {
+            mediaId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+            sortOrder: 0,
+            isPrimary: true
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "One or more selected media uploads are incomplete."
+    });
+    expect(createAdventureMock).not.toHaveBeenCalled();
 
     await app.close();
   });

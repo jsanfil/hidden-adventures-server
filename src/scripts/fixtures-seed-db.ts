@@ -1,4 +1,7 @@
-import { AdminGetUserCommand } from "@aws-sdk/client-cognito-identity-provider";
+import {
+  AdminGetUserCommand,
+  type AdminGetUserCommandOutput
+} from "@aws-sdk/client-cognito-identity-provider";
 import type { PoolClient } from "pg";
 
 import { env } from "../config/env.js";
@@ -60,7 +63,7 @@ async function resolveCognitoSubject(username: string): Promise<string> {
       UserPoolId: env.COGNITO_USER_POOL_ID,
       Username: username
     })
-  );
+  ) as AdminGetUserCommandOutput;
 
   const sub = getAttribute(response.UserAttributes, "sub");
   if (!sub) {

@@ -11,6 +11,7 @@ vi.mock("../src/db/client.js", () => ({
 }));
 
 import {
+  createAdventure,
   getAdventureById,
   getMediaDeliveryTarget,
   listAdventureMedia,
@@ -181,6 +182,83 @@ describe("adventures repository", () => {
     expect(dbMock.query).toHaveBeenCalledWith(
       expect.stringContaining("where media_assets.id = $2::uuid"),
       ["viewer-123", "f2f81540-45c1-4a0d-a080-9df1b8b020c2"]
+    );
+  });
+
+  it("creates an adventure and ordered media rows in one transaction", async () => {
+    const client = {
+      query: vi.fn()
+    };
+
+    client.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            status: "pending_moderation"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await createAdventure(
+      {
+        authorUserId: "viewer-123",
+        title: "Hidden Falls",
+        description: "Bring water and wear good shoes.",
+        categorySlug: "water_spots",
+        visibility: "public",
+        location: {
+          latitude: 34.12,
+          longitude: -118.45
+        },
+        placeLabel: "Hidden Falls Trailhead",
+        media: [
+          {
+            mediaId: "media-1",
+            sortOrder: 0,
+            isPrimary: true
+          },
+          {
+            mediaId: "media-2",
+            sortOrder: 1,
+            isPrimary: false
+          }
+        ],
+        status: "pending_moderation"
+      },
+      client as never
+    );
+
+    expect(result).toEqual({
+      id: "adventure-1",
+      status: "pending_moderation"
+    });
+    expect(client.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("insert into public.adventures"),
+      expect.arrayContaining([
+        "viewer-123",
+        "Hidden Falls",
+        "Bring water and wear good shoes.",
+        "water_spots",
+        "public",
+        "pending_moderation",
+        -118.45,
+        34.12,
+        "Hidden Falls Trailhead"
+      ])
+    );
+    expect(client.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("insert into public.adventure_media"),
+      [expect.any(String), "media-1", 0, true]
+    );
+    expect(client.query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("insert into public.adventure_media"),
+      [expect.any(String), "media-2", 1, false]
     );
   });
 });

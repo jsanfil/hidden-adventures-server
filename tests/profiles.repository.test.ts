@@ -229,6 +229,7 @@ describe("profiles repository", () => {
           latitude: 34.12,
           longitude: -118.45
         },
+        placeLabel: null,
         author: {
           handle: "jacksanfil",
           displayName: "Jack",

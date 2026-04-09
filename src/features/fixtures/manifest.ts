@@ -65,7 +65,7 @@ const AdventureSchema = z.object({
   description: z.string().min(1),
   categorySlug: z.enum(canonicalCategorySlugs),
   visibility: z.enum(["public", "connections", "private"]),
-  status: z.enum(["published", "draft", "archived"]).default("published"),
+  status: z.enum(["published", "draft", "archived", "pending_moderation"]).default("published"),
   longitude: z.number().optional(),
   latitude: z.number().optional(),
   placeLabel: z.string().optional(),

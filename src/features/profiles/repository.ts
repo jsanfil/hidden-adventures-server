@@ -132,6 +132,7 @@ function mapProfileAdventure(row: ProfileAdventureRow, author: ProfileDetail): A
             longitude: row.longitude
           }
         : null,
+    placeLabel: null,
     author: {
       handle: author.handle,
       displayName: author.displayName,

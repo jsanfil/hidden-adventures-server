@@ -509,6 +509,7 @@ describe("buildApp", () => {
             latitude: 34.12,
             longitude: -118.45
           },
+          placeLabel: null,
           author: {
             handle: localFixtureContent.profileHandle,
             displayName: "Fixture Author",

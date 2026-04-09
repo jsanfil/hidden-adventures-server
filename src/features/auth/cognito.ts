@@ -2,6 +2,7 @@ import {
   CognitoIdentityProviderClient,
   ListUsersCommand,
   type AttributeType,
+  type ListUsersCommandOutput,
   type UserType
 } from "@aws-sdk/client-cognito-identity-provider";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
@@ -139,7 +140,7 @@ export async function listCognitoUsers(
         UserPoolId: getConfiguredPoolId(),
         PaginationToken: paginationToken
       })
-    );
+    ) as ListUsersCommandOutput;
 
     for (const user of response.Users ?? []) {
       const mapped = mapDirectoryUser(user);

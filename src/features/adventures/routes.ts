@@ -2,9 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { env } from "../../config/env.js";
+import { db } from "../../db/client.js";
 import { requireAuthenticatedRequest } from "../auth/plugin.js";
-import { fetchMediaObject } from "../media/storage.js";
+import { listOwnedMediaAssetsForAdventureCreate } from "../media/repository.js";
+import { checkMediaObjectExists, fetchMediaObject } from "../media/storage.js";
 import {
+  createAdventure,
   getAdventureById,
   getMediaDeliveryTarget,
   listAdventureMedia,
@@ -24,6 +27,70 @@ const detailParamsSchema = z.object({
 
 const mediaParamsSchema = z.object({
   id: z.string().uuid()
+});
+
+const createAdventureBodySchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(5_000).optional().nullable(),
+  categorySlug: z.enum([
+    "viewpoints",
+    "trails",
+    "water_spots",
+    "food_drink",
+    "abandoned_places",
+    "caves",
+    "nature_escapes",
+    "roadside_stops"
+  ]).optional().nullable(),
+  visibility: z.enum(["private", "connections", "public"]),
+  location: z.object({
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180)
+  }).strict().optional().nullable(),
+  placeLabel: z.string().trim().max(160).optional().nullable(),
+  media: z.array(
+    z.object({
+      mediaId: z.string().uuid(),
+      sortOrder: z.number().int().min(0).max(99),
+      isPrimary: z.boolean()
+    }).strict()
+  ).min(1).max(20)
+}).strict().superRefine((value, ctx) => {
+  const sortOrders = new Set<number>();
+  const mediaIds = new Set<string>();
+  let primaryCount = 0;
+
+  for (const [index, item] of value.media.entries()) {
+    if (sortOrders.has(item.sortOrder)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["media", index, "sortOrder"],
+        message: "sortOrder values must be unique."
+      });
+    }
+    sortOrders.add(item.sortOrder);
+
+    if (mediaIds.has(item.mediaId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["media", index, "mediaId"],
+        message: "mediaId values must be unique."
+      });
+    }
+    mediaIds.add(item.mediaId);
+
+    if (item.isPrimary) {
+      primaryCount += 1;
+    }
+  }
+
+  if (primaryCount !== 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["media"],
+      message: "Exactly one media item must be marked primary."
+    });
+  }
 });
 
 export async function adventureRoutes(app: FastifyInstance): Promise<void> {
@@ -126,5 +193,77 @@ export async function adventureRoutes(app: FastifyInstance): Promise<void> {
       .header("etag", etag)
       .header("content-length", object.contentLength ?? media.byteSize ?? object.body.length)
       .send(object.body);
+  });
+
+  app.post("/adventures", async (request, reply) => {
+    const viewer = request.authContext?.viewer;
+    if (!viewer) {
+      return reply.code(403).send({
+        error: "Adventure creation requires a completed local account."
+      });
+    }
+
+    if (!env.S3_BUCKET) {
+      request.log.error("S3_BUCKET is required for adventure creation.");
+      return reply.code(503).send({
+        error: "Adventure creation is unavailable."
+      });
+    }
+
+    const body = createAdventureBodySchema.parse(request.body);
+    const ownedMedia = await listOwnedMediaAssetsForAdventureCreate({
+      ownerUserId: viewer.id,
+      mediaIds: body.media.map((item) => item.mediaId)
+    });
+
+    if (ownedMedia.length !== body.media.length) {
+      return reply.code(400).send({
+        error: "One or more selected media items are unavailable."
+      });
+    }
+
+    if (ownedMedia.some((item) => item.alreadyAttached)) {
+      return reply.code(400).send({
+        error: "One or more selected media items are already attached to an adventure."
+      });
+    }
+
+    const uploadedResults = await Promise.all(
+      ownedMedia.map(async (item) => ({
+        mediaId: item.id,
+        exists: await checkMediaObjectExists({
+          bucket: env.S3_BUCKET!,
+          key: item.storageKey,
+          region: env.AWS_REGION
+        })
+      }))
+    );
+
+    if (uploadedResults.some((result) => result.exists === false)) {
+      return reply.code(400).send({
+        error: "One or more selected media uploads are incomplete."
+      });
+    }
+
+    const created = await db.withTransaction((client) =>
+      createAdventure(
+        {
+          authorUserId: viewer.id,
+          title: body.title,
+          description: body.description?.trim() || null,
+          categorySlug: body.categorySlug ?? null,
+          visibility: body.visibility,
+          location: body.location ?? null,
+          placeLabel: body.placeLabel?.trim() || null,
+          media: body.media,
+          status: "pending_moderation"
+        },
+        client
+      )
+    );
+
+    return reply.code(201).send({
+      item: created
+    });
   });
 }
