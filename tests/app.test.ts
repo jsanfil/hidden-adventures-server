@@ -85,6 +85,7 @@ function makeAdventureRow(overrides: Record<string, unknown> = {}) {
     rating_count: 2,
     average_rating: 4.5,
     place_label: "Hidden Falls Trailhead",
+    distance_miles: null,
     updated_at: "2026-03-03T00:00:00.000Z",
     ...overrides
   };
@@ -253,6 +254,114 @@ describe("buildApp", () => {
     await app.close();
   });
 
+  it("returns geo-scoped feed results with scope metadata and distance miles", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ distance_miles: 7.4, place_label: "Topanga" })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?limit=1&offset=0&latitude=34.1201&longitude=-118.4512&radiusMiles=25&sort=distance",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      scope: {
+        center: {
+          latitude: 34.1201,
+          longitude: -118.4512
+        },
+        radiusMiles: 25
+      },
+      items: [
+        {
+          id: "adventure-1",
+          title: "Hidden Falls",
+          description: "Bring water and wear good shoes.",
+          categorySlug: "water_spots",
+          visibility: "public",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          publishedAt: "2026-03-02T00:00:00.000Z",
+          location: {
+            latitude: 34.12,
+            longitude: -118.45
+          },
+          placeLabel: "Topanga",
+          author: {
+            handle: localFixtureContent.profileHandle,
+            displayName: "Fixture Author",
+            homeCity: "Los Angeles",
+            homeRegion: "CA"
+          },
+          primaryMedia: {
+            id: "media-1",
+            storageKey: "adventures/media-1.jpg"
+          },
+          stats: {
+            favoriteCount: 8,
+            commentCount: 3,
+            ratingCount: 2,
+            averageRating: 4.5
+          },
+          distanceMiles: 7.4
+        }
+      ],
+      paging: {
+        limit: 1,
+        offset: 0,
+        returned: 1
+      }
+    });
+    expect(dbMock.query).toHaveBeenCalledTimes(2);
+
+    await app.close();
+  });
+
+  it("defaults geo-scoped feed results to recent ordering when sort is omitted", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ distance_miles: 7.4 })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?limit=1&offset=0&latitude=34.1201&longitude=-118.4512&radiusMiles=25",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(
+      expect.objectContaining({
+        scope: {
+          center: {
+            latitude: 34.1201,
+            longitude: -118.4512
+          },
+          radiusMiles: 25
+        },
+        paging: {
+          limit: 1,
+          offset: 0,
+          returned: 1
+        }
+      })
+    );
+
+    await app.close();
+  });
+
   it("requires auth for feed reads", async () => {
     const app = await buildApp();
 
@@ -280,6 +389,44 @@ describe("buildApp", () => {
     const response = await app.inject({
       method: "GET",
       url: "/api/feed?limit=0",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(dbMock.query).toHaveBeenCalledTimes(1);
+
+    await app.close();
+  });
+
+  it("returns 400 when feed geo query params are partial", async () => {
+    dbMock.query.mockResolvedValueOnce({
+      rows: [makeLocalUserRow()]
+    } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?latitude=34.1201",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(dbMock.query).toHaveBeenCalledTimes(1);
+
+    await app.close();
+  });
+
+  it("returns 400 when feed requests distance sort without geo scope", async () => {
+    dbMock.query.mockResolvedValueOnce({
+      rows: [makeLocalUserRow()]
+    } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?sort=distance",
       headers: authHeaders()
     });
 

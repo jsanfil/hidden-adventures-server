@@ -121,32 +121,34 @@ describe("adventure routes", () => {
   });
 
   it("passes authContext.viewer.id into feed reads", async () => {
-    listFeedMock.mockResolvedValue([
-      {
-        id: "adventure-1",
-        title: "Hidden Falls",
-        description: "Bring water and wear good shoes.",
-        categorySlug: "water_spots",
-        visibility: "public",
-        createdAt: "2026-03-01T00:00:00.000Z",
-        publishedAt: "2026-03-02T00:00:00.000Z",
-        location: null,
-        placeLabel: "Hidden Falls Trailhead",
-        author: {
-          handle: "jacksanfil",
-          displayName: "Jack",
-          homeCity: "Los Angeles",
-          homeRegion: "CA"
-        },
-        primaryMedia: null,
-        stats: {
-          favoriteCount: 0,
-          commentCount: 0,
-          ratingCount: 0,
-          averageRating: 0
+    listFeedMock.mockResolvedValue({
+      items: [
+        {
+          id: "adventure-1",
+          title: "Hidden Falls",
+          description: "Bring water and wear good shoes.",
+          categorySlug: "water_spots",
+          visibility: "public",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          publishedAt: "2026-03-02T00:00:00.000Z",
+          location: null,
+          placeLabel: "Hidden Falls Trailhead",
+          author: {
+            handle: "jacksanfil",
+            displayName: "Jack",
+            homeCity: "Los Angeles",
+            homeRegion: "CA"
+          },
+          primaryMedia: null,
+          stats: {
+            favoriteCount: 0,
+            commentCount: 0,
+            ratingCount: 0,
+            averageRating: 0
+          }
         }
-      }
-    ]);
+      ]
+    });
 
     const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
 
@@ -157,10 +159,13 @@ describe("adventure routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(listFeedMock).toHaveBeenCalledWith({
-      viewerId: "viewer-123",
       viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
       limit: 1,
-      offset: 0
+      offset: 0,
+      latitude: undefined,
+      longitude: undefined,
+      radiusMiles: undefined,
+      sort: undefined
     });
     expect(response.json()).toEqual({
       items: [
@@ -176,6 +181,121 @@ describe("adventure routes", () => {
         offset: 0,
         returned: 1
       }
+    });
+
+    await app.close();
+  });
+
+  it("returns geo-scoped feed metadata and forwards geo params", async () => {
+    listFeedMock.mockResolvedValue({
+      scope: {
+        center: {
+          latitude: 34.1201,
+          longitude: -118.4512
+        },
+        radiusMiles: 25
+      },
+      items: [
+        {
+          id: "adventure-1",
+          title: "Hidden Falls",
+          description: "Bring water and wear good shoes.",
+          categorySlug: "water_spots",
+          visibility: "public",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          publishedAt: "2026-03-02T00:00:00.000Z",
+          location: {
+            latitude: 34.12,
+            longitude: -118.45
+          },
+          placeLabel: "Topanga",
+          author: {
+            handle: "jacksanfil",
+            displayName: "Jack",
+            homeCity: "Los Angeles",
+            homeRegion: "CA"
+          },
+          primaryMedia: null,
+          stats: {
+            favoriteCount: 0,
+            commentCount: 0,
+            ratingCount: 0,
+            averageRating: 0
+          },
+          distanceMiles: 7.4
+        }
+      ]
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?limit=1&offset=0&latitude=34.1201&longitude=-118.4512&radiusMiles=25&sort=distance"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listFeedMock).toHaveBeenCalledWith({
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
+      limit: 1,
+      offset: 0,
+      latitude: 34.1201,
+      longitude: -118.4512,
+      radiusMiles: 25,
+      sort: "distance"
+    });
+    expect(response.json()).toEqual({
+      scope: {
+        center: {
+          latitude: 34.1201,
+          longitude: -118.4512
+        },
+        radiusMiles: 25
+      },
+      items: [
+        expect.objectContaining({
+          id: "adventure-1",
+          distanceMiles: 7.4
+        })
+      ],
+      paging: {
+        limit: 1,
+        offset: 0,
+        returned: 1
+      }
+    });
+
+    await app.close();
+  });
+
+  it("defaults geo-scoped feed reads to recent sorting when sort is omitted", async () => {
+    listFeedMock.mockResolvedValue({
+      scope: {
+        center: {
+          latitude: 34.1201,
+          longitude: -118.4512
+        },
+        radiusMiles: 25
+      },
+      items: []
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?limit=1&offset=0&latitude=34.1201&longitude=-118.4512&radiusMiles=25"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listFeedMock).toHaveBeenCalledWith({
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
+      limit: 1,
+      offset: 0,
+      latitude: 34.1201,
+      longitude: -118.4512,
+      radiusMiles: 25,
+      sort: undefined
     });
 
     await app.close();
@@ -259,6 +379,34 @@ describe("adventure routes", () => {
     expect(detailResponse.statusCode).toBe(400);
     expect(listFeedMock).not.toHaveBeenCalled();
     expect(getAdventureByIdMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("rejects partial geo feed queries", async () => {
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?latitude=34.1201"
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(listFeedMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("rejects distance sort without geo scope", async () => {
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/feed?sort=distance"
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(listFeedMock).not.toHaveBeenCalled();
 
     await app.close();
   });

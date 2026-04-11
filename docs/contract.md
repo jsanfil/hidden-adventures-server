@@ -1,6 +1,6 @@
-# Slice 1 Contract Lock
+# Server Contract
 
-This document freezes the current Slice 1 contract from the implemented server routes and the Vitest suite in `hidden-adventures-server`.
+This document describes the current implemented API contract for `hidden-adventures-server`, derived from the route code and the Vitest suite.
 
 Vitest is the acceptance source for this contract. The Postman repo stays aligned for manual troubleshooting only.
 
@@ -23,14 +23,29 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - query:
   - `limit`: integer, min `1`, max `50`, default `20`
   - `offset`: integer, min `0`, default `0`
+  - `latitude`: optional number, min `-90`, max `90`
+  - `longitude`: optional number, min `-180`, max `180`
+  - `radiusMiles`: optional number, min `1`, max `100`, default `25`
+  - `sort`: optional enum `recent | distance`
+  - `latitude` and `longitude` must be provided together
+  - `sort=distance` requires `latitude` and `longitude`
 - any extra query param is rejected with `400`
 - `viewerHandle` is rejected with `400`
 - response: `200`
+- default behavior:
+  - without `latitude` and `longitude`, the feed returns the standard visibility-filtered recent feed
+  - with geo scope and omitted `sort`, the feed filters by `radiusMiles` and then sorts by recency
+  - with geo scope and `sort=distance`, the feed filters by `radiusMiles` and then sorts by nearest first
 - stable top-level fields:
+  - `scope` when geo filtering is active
   - `items`
   - `paging.limit`
   - `paging.offset`
   - `paging.returned`
+- stable `scope` fields when present:
+  - `center.latitude`
+  - `center.longitude`
+  - `radiusMiles`
 - stable feed item fields:
   - `id`
   - `title`
@@ -51,6 +66,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `stats.commentCount`
   - `stats.ratingCount`
   - `stats.averageRating`
+  - `distanceMiles` when geo filtering is active
 
 ### `GET /api/adventures/:id`
 
@@ -208,6 +224,8 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - `primaryMedia.id` is the stable feed-card media reference in Slice 1.
 - `primaryMedia.storageKey` may still appear in JSON payloads, but the client must not treat it as a delivery URL or construct S3 requests from it.
 - `location` is either `null` or `{ latitude, longitude }`.
+- `distanceMiles` is present only for geo-scoped feed reads and is a numeric mile distance rounded to one decimal place.
+- Geo-scoped feed reads default to recency ordering when `sort` is omitted.
 - `stats` is always present on adventure payloads. Missing database aggregates are normalized to zeroes.
 - `profile.email` is not exposed by `GET /api/profiles/:handle`.
 - `user` in auth payloads may be `null` when `accountState` is `new_user_needs_handle`.
@@ -217,11 +235,11 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 ## Intentional Non-Contract Items
 
 - No map-specific endpoint exists yet in this server repo.
-- Feed remains single-image in Slice 1 even though detail media is now ordered for future carousel work.
+- Feed remains single-image even though detail media is now ordered for future carousel work.
 - No favorites, comments, ratings, or connections-management write surface is part of this lock.
 - Postman request definitions are for manual smoke checks only and are not formal acceptance.
 
-## Remaining Gaps Before Broader Slice 1 Completion
+## Current Documentation Notes
 
-- The iOS app still needs to replace fixture-era `viewerHandle` plumbing with bearer-token-backed auth/bootstrap integration.
-- No OpenAPI schema or generated client exists yet; the locked contract currently lives in route code, Vitest, and this handoff document.
+- The iOS app should continue to rely on bearer-auth viewer identity rather than any handle-based viewer override.
+- No OpenAPI schema or generated client exists yet; the current contract lives in route code, Vitest, and this document.

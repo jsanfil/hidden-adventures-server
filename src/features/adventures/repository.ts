@@ -25,6 +25,7 @@ type AdventureFeedRow = QueryResultRow & {
   rating_count: number | null;
   average_rating: number | null;
   place_label: string | null;
+  distance_miles: number | null;
 };
 
 export type AdventureCard = {
@@ -56,6 +57,20 @@ export type AdventureCard = {
     ratingCount: number;
     averageRating: number;
   };
+  distanceMiles?: number;
+};
+
+export type FeedScope = {
+  center: {
+    latitude: number;
+    longitude: number;
+  };
+  radiusMiles: number;
+};
+
+export type FeedListResult = {
+  items: AdventureCard[];
+  scope?: FeedScope;
 };
 
 type AdventureDetailRow = AdventureFeedRow & {
@@ -126,6 +141,8 @@ export type CreatedAdventure = {
 };
 
 function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
+  const distanceMiles = row.distance_miles;
+
   return {
     id: row.id,
     title: row.title,
@@ -160,7 +177,8 @@ function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
       commentCount: row.comment_count ?? 0,
       ratingCount: row.rating_count ?? 0,
       averageRating: row.average_rating ?? 0
-    }
+    },
+    ...(distanceMiles !== null && distanceMiles !== undefined ? { distanceMiles } : {})
   };
 }
 
@@ -212,7 +230,11 @@ const feedSelect = `
     adventure_stats.comment_count,
     adventure_stats.rating_count,
     adventure_stats.average_rating,
-    adventures.place_label
+    adventures.place_label,
+    case
+      when scope.center_point is null or adventures.location is null then null
+      else round(((st_distance(adventures.location, scope.center_point) / 1609.344)::numeric), 1)::double precision
+    end as distance_miles
 `;
 
 const feedJoins = `
@@ -234,24 +256,70 @@ export async function listFeed(options: {
   viewerId?: string;
   limit: number;
   offset: number;
-}): Promise<AdventureCard[]> {
+  latitude?: number;
+  longitude?: number;
+  radiusMiles?: number;
+  sort?: "recent" | "distance";
+}): Promise<FeedListResult> {
+  const hasGeoScope = options.latitude !== undefined && options.longitude !== undefined;
+  const radiusMiles = hasGeoScope ? (options.radiusMiles ?? 25) : undefined;
+  const orderBy = hasGeoScope && options.sort === "distance"
+    ? "distance_miles asc nulls last, adventures.id desc"
+    : "coalesce(adventures.published_at, adventures.created_at) desc, adventures.id desc";
+
   const result = await db.query<AdventureFeedRow>(
     `
       with viewer as (
         select $1::uuid as id
+      ),
+      scope as (
+        select
+          case
+            when $4::double precision is null or $5::double precision is null then null
+            else st_setsrid(st_makepoint($5::double precision, $4::double precision), 4326)::geography
+          end as center_point,
+          ($6::double precision * 1609.344) as radius_meters
       )
       ${feedSelect}
       ${feedJoins}
+      cross join scope
       where adventures.status = 'published'
         and ${visibilityClause()}
-      order by coalesce(adventures.published_at, adventures.created_at) desc, adventures.id desc
+        and (
+          scope.center_point is null
+          or (
+            adventures.location is not null
+            and st_dwithin(adventures.location, scope.center_point, scope.radius_meters)
+          )
+        )
+      order by ${orderBy}
       limit $2
       offset $3
     `,
-    [options.viewerId ?? null, options.limit, options.offset]
+    [
+      options.viewerId ?? null,
+      options.limit,
+      options.offset,
+      hasGeoScope ? options.latitude ?? null : null,
+      hasGeoScope ? options.longitude ?? null : null,
+      radiusMiles ?? null
+    ]
   );
 
-  return result.rows.map(mapAdventureCard);
+  return {
+    items: result.rows.map(mapAdventureCard),
+    ...(hasGeoScope && radiusMiles !== undefined
+      ? {
+          scope: {
+            center: {
+              latitude: options.latitude!,
+              longitude: options.longitude!
+            },
+            radiusMiles
+          }
+        }
+      : {})
+  };
 }
 
 export async function getAdventureById(options: {

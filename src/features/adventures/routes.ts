@@ -16,8 +16,31 @@ import {
 
 const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  offset: z.coerce.number().int().min(0).default(0)
-}).strict();
+  offset: z.coerce.number().int().min(0).default(0),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+  radiusMiles: z.coerce.number().min(1).max(100).default(25),
+  sort: z.enum(["recent", "distance"]).optional()
+}).strict().superRefine((value, ctx) => {
+  const hasLatitude = value.latitude !== undefined;
+  const hasLongitude = value.longitude !== undefined;
+
+  if (hasLatitude !== hasLongitude) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: hasLatitude ? ["longitude"] : ["latitude"],
+      message: "latitude and longitude must be provided together."
+    });
+  }
+
+  if (!hasLatitude && value.sort === "distance") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["sort"],
+      message: "sort=distance requires latitude and longitude."
+    });
+  }
+});
 
 const detailQuerySchema = z.object({}).strict();
 
@@ -98,18 +121,23 @@ export async function adventureRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/feed", async (request) => {
     const query = feedQuerySchema.parse(request.query);
-    const items = await listFeed({
+    const result = await listFeed({
       viewerId: request.authContext?.viewer?.id,
       limit: query.limit,
-      offset: query.offset
+      offset: query.offset,
+      latitude: query.latitude,
+      longitude: query.longitude,
+      radiusMiles: query.latitude !== undefined ? query.radiusMiles : undefined,
+      sort: query.sort
     });
 
     return {
-      items,
+      ...(result.scope ? { scope: result.scope } : {}),
+      items: result.items,
       paging: {
         limit: query.limit,
         offset: query.offset,
-        returned: items.length
+        returned: result.items.length
       }
     };
   });

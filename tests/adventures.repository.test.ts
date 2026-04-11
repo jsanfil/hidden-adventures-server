@@ -46,7 +46,8 @@ describe("adventures repository", () => {
           comment_count: null,
           rating_count: null,
           average_rating: null,
-          place_label: null
+          place_label: null,
+          distance_miles: null
         }
       ]
     });
@@ -57,42 +58,128 @@ describe("adventures repository", () => {
       offset: 0
     });
 
-    expect(result).toEqual([
-      {
-        id: "adventure-1",
-        title: "Quiet Ridge",
-        description: null,
-        categorySlug: "viewpoints",
-        visibility: "public",
-        createdAt: "2026-03-01T00:00:00.000Z",
-        publishedAt: null,
-        location: null,
-        placeLabel: null,
-        author: {
-          handle: "jacksanfil",
-          displayName: null,
-          homeCity: null,
-          homeRegion: null
-        },
-        primaryMedia: null,
-        stats: {
-          favoriteCount: 0,
-          commentCount: 0,
-          ratingCount: 0,
-          averageRating: 0
+    expect(result).toEqual({
+      items: [
+        {
+          id: "adventure-1",
+          title: "Quiet Ridge",
+          description: null,
+          categorySlug: "viewpoints",
+          visibility: "public",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          publishedAt: null,
+          location: null,
+          placeLabel: null,
+          author: {
+            handle: "jacksanfil",
+            displayName: null,
+            homeCity: null,
+            homeRegion: null
+          },
+          primaryMedia: null,
+          stats: {
+            favoriteCount: 0,
+            commentCount: 0,
+            ratingCount: 0,
+            averageRating: 0
+          }
         }
-      }
-    ]);
+      ]
+    });
     expect(dbMock.query).toHaveBeenCalledWith(expect.stringContaining("from public.adventures adventures"), [
       null,
       20,
-      0
+      0,
+      null,
+      null,
+      null
     ]);
     expect(dbMock.query).toHaveBeenCalledWith(
       expect.stringContaining("select $1::uuid as id"),
-      [null, 20, 0]
+      [null, 20, 0, null, null, null]
     );
     expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("where handle = $1");
+  });
+
+  it("adds scope and distance miles for geo-scoped feed queries", async () => {
+    dbMock.query.mockResolvedValue({
+      rows: [
+        {
+          id: "adventure-1",
+          title: "Quiet Ridge",
+          description: null,
+          category_slug: "viewpoints",
+          visibility: "public",
+          created_at: "2026-03-01T00:00:00.000Z",
+          published_at: null,
+          latitude: 34.1,
+          longitude: -118.4,
+          author_handle: "jacksanfil",
+          author_display_name: null,
+          author_home_city: null,
+          author_home_region: null,
+          primary_media_id: null,
+          primary_media_storage_key: null,
+          favorite_count: null,
+          comment_count: null,
+          rating_count: null,
+          average_rating: null,
+          place_label: "Topanga",
+          distance_miles: 7.4
+        }
+      ]
+    });
+
+    const result = await listFeed({
+      viewerId: "viewer-123",
+      limit: 20,
+      offset: 0,
+      latitude: 34.1201,
+      longitude: -118.4512,
+      radiusMiles: 25,
+      sort: "distance"
+    });
+
+    expect(result).toEqual({
+      scope: {
+        center: {
+          latitude: 34.1201,
+          longitude: -118.4512
+        },
+        radiusMiles: 25
+      },
+      items: [
+        expect.objectContaining({
+          id: "adventure-1",
+          distanceMiles: 7.4
+        })
+      ]
+    });
+    expect(dbMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("st_dwithin(adventures.location, scope.center_point, scope.radius_meters)"),
+      ["viewer-123", 20, 0, 34.1201, -118.4512, 25]
+    );
+    expect(dbMock.query.mock.calls[0]?.[0]).toContain("distance_miles asc nulls last");
+  });
+
+  it("defaults geo-scoped feed queries without sort to recent ordering", async () => {
+    dbMock.query.mockResolvedValue({
+      rows: []
+    });
+
+    await listFeed({
+      viewerId: "viewer-123",
+      limit: 20,
+      offset: 0,
+      latitude: 34.1201,
+      longitude: -118.4512,
+      radiusMiles: 25
+    });
+
+    expect(dbMock.query.mock.calls[0]?.[0]).toContain(
+      "coalesce(adventures.published_at, adventures.created_at) desc, adventures.id desc"
+    );
+    expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("distance_miles asc nulls last");
   });
 
   it("returns null when a detail lookup finds no visible adventure", async () => {

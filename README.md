@@ -2,6 +2,12 @@
 
 TypeScript backend for the Hidden Adventures rebuild.
 
+## Contract Source
+
+The canonical API contract lives in [docs/contract.md](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/docs/contract.md).
+
+When a route, payload, validation rule, or default response behavior changes, update both the Vitest coverage and `docs/contract.md` in the same change.
+
 ## Goals
 
 - relational domain model with PostgreSQL + PostGIS
@@ -69,8 +75,6 @@ Helpful deployment commands:
 
 The current suite covers the shipped Slice 1 read surface, auth bootstrap and handle selection behavior, repository mapping, and request validation. Read-route tests explicitly reject the retired `viewerHandle` query-param pattern.
 
-The locked Slice 1 contract handoff for the iOS thread lives in `docs/slice-1-contract.md`.
-
 ## Initial Runtime Shape
 
 - `app`: Fastify-based API service
@@ -98,6 +102,9 @@ Notes:
 - In production (`NODE_ENV=production`), the server fails fast unless `AUTH_MODE=cognito`.
 - `viewerHandle` is no longer part of the public request contract.
 - feed cards keep using `primaryMedia.id`; clients must not treat `storageKey` as a delivery URL.
+- `GET /api/feed` supports optional geo scope with `latitude`, `longitude`, and `radiusMiles`.
+- `GET /api/feed` defaults to recent ordering when geo scope is absent, and also when geo scope is present but `sort` is omitted.
+- `GET /api/feed?sort=distance` requires geo scope.
 - `GET /api/adventures/:id/media` returns the ordered media references for detail carousels.
 - `GET /api/media/:id` is the authenticated byte-delivery route for feed and detail images and keeps S3 details server-side.
 - the current Slice 1 profile-write surface is limited to `GET /api/me/profile` and `PUT /api/me/profile`; handle creation remains on `POST /api/auth/handle`
