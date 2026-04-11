@@ -196,6 +196,8 @@ describe("adventures repository", () => {
       expect.stringContaining("select $1::uuid as id"),
       [null, "4b5edc1d-f292-45b4-8972-7b977ebf5298"]
     );
+    expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("scope.center_point");
+    expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("cross join scope");
   });
 
   it("returns ordered adventure media for a visible detail carousel", async () => {

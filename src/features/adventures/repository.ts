@@ -209,7 +209,7 @@ function visibilityClause(): string {
   `;
 }
 
-const feedSelect = `
+const adventureBaseSelect = `
   select
     adventures.id::text as id,
     adventures.title,
@@ -230,11 +230,15 @@ const feedSelect = `
     adventure_stats.comment_count,
     adventure_stats.rating_count,
     adventure_stats.average_rating,
-    adventures.place_label,
-    case
-      when scope.center_point is null or adventures.location is null then null
-      else round(((st_distance(adventures.location, scope.center_point) / 1609.344)::numeric), 1)::double precision
-    end as distance_miles
+    adventures.place_label
+`;
+
+const feedGeoSelect = `
+  ,
+  case
+    when scope.center_point is null or adventures.location is null then null
+    else round(((st_distance(adventures.location, scope.center_point) / 1609.344)::numeric), 1)::double precision
+  end as distance_miles
 `;
 
 const feedJoins = `
@@ -280,7 +284,8 @@ export async function listFeed(options: {
           end as center_point,
           ($6::double precision * 1609.344) as radius_meters
       )
-      ${feedSelect}
+      ${adventureBaseSelect}
+      ${feedGeoSelect}
       ${feedJoins}
       cross join scope
       where adventures.status = 'published'
@@ -331,7 +336,7 @@ export async function getAdventureById(options: {
       with viewer as (
         select $1::uuid as id
       )
-      ${feedSelect},
+      ${adventureBaseSelect},
       adventures.updated_at::text as updated_at
       ${feedJoins}
       where adventures.id = $2::uuid
