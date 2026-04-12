@@ -12,6 +12,7 @@ import {
   listAdventureMedia,
   listFeed
 } from "./repository.js";
+import { toStoredAdventureVisibility } from "./visibility.js";
 
 const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -60,7 +61,7 @@ const createAdventureBodySchema = z.object({
     "nature_escapes",
     "roadside_stops"
   ]).optional().nullable(),
-  visibility: z.enum(["private", "connections", "public"]),
+  visibility: z.enum(["private", "sidekicks", "public"]),
   location: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180)
@@ -232,7 +233,7 @@ export async function adventureRoutes(app: FastifyInstance): Promise<void> {
           title: body.title,
           description: body.description?.trim() || null,
           categorySlug: body.categorySlug ?? null,
-          visibility: body.visibility,
+          visibility: toStoredAdventureVisibility(body.visibility),
           location: body.location ?? null,
           placeLabel: body.placeLabel?.trim() || null,
           media: body.media,

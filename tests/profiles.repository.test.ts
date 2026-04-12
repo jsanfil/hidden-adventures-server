@@ -252,4 +252,56 @@ describe("profiles repository", () => {
       0
     ]);
   });
+
+  it("maps stored connections visibility into sidekicks for profile adventure payloads", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "user-1",
+            handle: "jacksanfil",
+            display_name: "Jack",
+            bio: "Explorer",
+            home_city: "Los Angeles",
+            home_region: "CA",
+            avatar_media_id: null,
+            avatar_storage_key: null,
+            cover_media_id: null,
+            cover_storage_key: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-03-01T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            title: "Quiet Ridge",
+            description: "Best at sunset.",
+            category_slug: "viewpoints",
+            visibility: "connections",
+            created_at: "2026-03-01T00:00:00.000Z",
+            published_at: "2026-03-02T00:00:00.000Z",
+            latitude: 34.12,
+            longitude: -118.45,
+            primary_media_id: null,
+            primary_media_storage_key: null,
+            favorite_count: 1,
+            comment_count: 2,
+            rating_count: 3,
+            average_rating: 4.67
+          }
+        ]
+      });
+
+    const result = await listProfileAdventures({
+      profileHandle: "jacksanfil",
+      viewerId: "viewer-1",
+      limit: 10,
+      offset: 0
+    });
+
+    expect(result[0]?.visibility).toBe("sidekicks");
+  });
 });

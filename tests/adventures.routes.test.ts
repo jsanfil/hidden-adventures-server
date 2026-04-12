@@ -506,6 +506,78 @@ describe("adventure routes", () => {
     await app.close();
   });
 
+  it("creates a sidekicks adventure using the stored connections visibility", async () => {
+    listOwnedMediaAssetsForAdventureCreateMock.mockResolvedValue([
+      {
+        id: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+        storageKey: "adventures/fixture_author_media-1.jpg",
+        mimeType: "image/jpeg",
+        byteSize: 123,
+        width: 1200,
+        height: 900,
+        alreadyAttached: false
+      }
+    ]);
+    checkMediaObjectExistsMock.mockResolvedValue(true);
+    createAdventureMock.mockResolvedValue({
+      id: "adventure-1",
+      status: "pending_moderation"
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures",
+      payload: {
+        title: "Sidekick Only Spot",
+        visibility: "sidekicks",
+        media: [
+          {
+            mediaId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+            sortOrder: 0,
+            isPrimary: true
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(createAdventureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visibility: "connections"
+      }),
+      expect.anything()
+    );
+
+    await app.close();
+  });
+
+  it("rejects the legacy connections visibility value", async () => {
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures",
+      payload: {
+        title: "Legacy Visibility",
+        visibility: "connections",
+        media: [
+          {
+            mediaId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+            sortOrder: 0,
+            isPrimary: true
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(createAdventureMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   it("rejects missing uploaded media before creation", async () => {
     listOwnedMediaAssetsForAdventureCreateMock.mockResolvedValue([
       {

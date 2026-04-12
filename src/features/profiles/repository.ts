@@ -2,6 +2,7 @@ import type { PoolClient, QueryResult, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
 import type { AdventureCard } from "../adventures/repository.js";
+import { toApiAdventureVisibility } from "../adventures/visibility.js";
 
 type Queryable = PoolClient | typeof db;
 
@@ -122,7 +123,7 @@ function mapProfileAdventure(row: ProfileAdventureRow, author: ProfileDetail): A
     title: row.title,
     description: row.description,
     categorySlug: row.category_slug,
-    visibility: row.visibility,
+    visibility: toApiAdventureVisibility(row.visibility),
     createdAt: row.created_at,
     publishedAt: row.published_at,
     location:

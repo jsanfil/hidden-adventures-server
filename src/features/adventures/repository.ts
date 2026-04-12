@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
+import { toApiAdventureVisibility } from "./visibility.js";
 
 type AdventureFeedRow = QueryResultRow & {
   id: string;
@@ -128,7 +129,7 @@ function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
     title: row.title,
     description: row.description,
     categorySlug: row.category_slug,
-    visibility: row.visibility,
+    visibility: toApiAdventureVisibility(row.visibility),
     createdAt: row.created_at,
     publishedAt: row.published_at,
     location:

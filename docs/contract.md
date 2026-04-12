@@ -213,7 +213,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - Read visibility is currently:
   - authenticated viewers can read `public` adventures
   - an authenticated author can read their own published adventures
-  - an authenticated accepted connection can read `connections` visibility adventures
+  - an authenticated accepted sidekick can read `sidekicks` visibility adventures
   - non-visible or missing adventures collapse to the same `404`
 
 ## Payload Assumptions The iOS Thread May Rely On
@@ -236,7 +236,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 
 - No map-specific endpoint exists yet in this server repo.
 - Feed remains single-image even though detail media is now ordered for future carousel work.
-- No favorites, comments, ratings, or connections-management write surface is part of this lock.
+- No favorites, comments, ratings, or sidekick-management write surface is part of this lock.
 - Postman request definitions are for manual smoke checks only and are not formal acceptance.
 
 ## Current Documentation Notes

@@ -100,6 +100,44 @@ describe("adventures repository", () => {
     expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("where handle = $1");
   });
 
+  it("maps stored connections visibility into sidekicks for API cards", async () => {
+    dbMock.query.mockResolvedValue({
+      rows: [
+        {
+          id: "adventure-1",
+          title: "Quiet Ridge",
+          description: null,
+          category_slug: "viewpoints",
+          visibility: "connections",
+          created_at: "2026-03-01T00:00:00.000Z",
+          published_at: null,
+          latitude: null,
+          longitude: null,
+          author_handle: "jacksanfil",
+          author_display_name: null,
+          author_home_city: null,
+          author_home_region: null,
+          primary_media_id: null,
+          primary_media_storage_key: null,
+          favorite_count: null,
+          comment_count: null,
+          rating_count: null,
+          average_rating: null,
+          place_label: null,
+          distance_miles: null
+        }
+      ]
+    });
+
+    const result = await listFeed({
+      viewerId: "viewer-123",
+      limit: 20,
+      offset: 0
+    });
+
+    expect(result.items[0]?.visibility).toBe("sidekicks");
+  });
+
   it("adds scope and distance miles for geo-scoped feed queries", async () => {
     dbMock.query.mockResolvedValue({
       rows: [
