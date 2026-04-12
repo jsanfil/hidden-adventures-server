@@ -86,32 +86,12 @@ type AdventureMediaRow = QueryResultRow & {
   height: number | null;
 };
 
-type MediaDeliveryRow = QueryResultRow & {
-  media_id: string;
-  storage_key: string;
-  mime_type: string | null;
-  byte_size: number | null;
-  width: number | null;
-  height: number | null;
-  updated_at: string;
-};
-
 export type AdventureMediaItem = {
   id: string;
   sortOrder: number;
   isPrimary: boolean;
   width: number | null;
   height: number | null;
-};
-
-export type MediaDeliveryTarget = {
-  id: string;
-  storageKey: string;
-  mimeType: string | null;
-  byteSize: number | null;
-  width: number | null;
-  height: number | null;
-  updatedAt: string;
 };
 
 export type AdventureCreateMediaInput = {
@@ -182,7 +162,7 @@ function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
   };
 }
 
-function visibilityClause(): string {
+export function visibilityClause(): string {
   return `
     (
       adventures.visibility = 'public'
@@ -407,65 +387,6 @@ export async function listAdventureMedia(options: {
     width: row.width,
     height: row.height
   }));
-}
-
-export async function getMediaDeliveryTarget(options: {
-  mediaId: string;
-  viewerId?: string;
-}): Promise<MediaDeliveryTarget | null> {
-  const result = await db.query<MediaDeliveryRow>(
-    `
-      with viewer as (
-        select $1::uuid as id
-      )
-      select
-        media_assets.id::text as media_id,
-        media_assets.storage_key,
-        media_assets.mime_type,
-        media_assets.byte_size,
-        media_assets.width,
-        media_assets.height,
-        media_assets.updated_at::text as updated_at
-      from public.media_assets media_assets
-      where media_assets.id = $2::uuid
-        and media_assets.deleted_at is null
-        and media_assets.moderation_status <> 'rejected'
-        and (
-          exists (
-            select 1
-            from public.adventure_media adventure_media
-            join public.adventures adventures
-              on adventures.id = adventure_media.adventure_id
-            where adventure_media.media_asset_id = media_assets.id
-              and adventures.status = 'published'
-              and ${visibilityClause()}
-          )
-          or exists (
-            select 1
-            from public.profiles profiles
-            where profiles.avatar_media_asset_id = media_assets.id
-               or profiles.cover_media_asset_id = media_assets.id
-          )
-        )
-      limit 1
-    `,
-    [options.viewerId ?? null, options.mediaId]
-  );
-
-  const row = result.rows[0];
-  if (!row) {
-    return null;
-  }
-
-  return {
-    id: row.media_id,
-    storageKey: row.storage_key,
-    mimeType: row.mime_type,
-    byteSize: row.byte_size,
-    width: row.width,
-    height: row.height,
-    updatedAt: row.updated_at
-  };
 }
 
 export async function createAdventure(

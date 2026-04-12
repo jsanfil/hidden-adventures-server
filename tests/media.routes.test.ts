@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { localIdentityFixtures } from "../src/features/auth/local-fixtures.js";
 
-const { insertPendingMediaAssetsMock } = vi.hoisted(() => ({
+const { getMediaDeliveryTargetMock, insertPendingMediaAssetsMock } = vi.hoisted(() => ({
+  getMediaDeliveryTargetMock: vi.fn(),
   insertPendingMediaAssetsMock: vi.fn()
 }));
 
@@ -16,11 +17,17 @@ const { buildAdventureImageStorageKeyMock, createPresignedUploadMock, normalizeA
   }));
 
 vi.mock("../src/features/media/repository.js", () => ({
+  getMediaDeliveryTarget: getMediaDeliveryTargetMock,
   insertPendingMediaAssets: insertPendingMediaAssetsMock
+}));
+
+const { fetchMediaObjectMock } = vi.hoisted(() => ({
+  fetchMediaObjectMock: vi.fn()
 }));
 
 vi.mock("../src/features/media/storage.js", () => ({
   buildAdventureImageStorageKey: buildAdventureImageStorageKeyMock,
+  fetchMediaObject: fetchMediaObjectMock,
   createPresignedUpload: createPresignedUploadMock,
   normalizeAdventureImageMimeType: normalizeAdventureImageMimeTypeMock
 }));
@@ -61,10 +68,93 @@ async function buildMediaRouteApp(viewer?: { id: string; handle: string }) {
 
 describe("media routes", () => {
   beforeEach(() => {
+    getMediaDeliveryTargetMock.mockReset();
     insertPendingMediaAssetsMock.mockReset();
     buildAdventureImageStorageKeyMock.mockReset();
+    fetchMediaObjectMock.mockReset();
     createPresignedUploadMock.mockReset();
     normalizeAdventureImageMimeTypeMock.mockReset();
+  });
+
+  it("streams media bytes for visible media ids", async () => {
+    getMediaDeliveryTargetMock.mockResolvedValue({
+      id: "media-1",
+      storageKey: "fixtures/test-core/adventures/fixture-falls.jpg",
+      mimeType: "image/jpeg",
+      byteSize: 12,
+      width: 1200,
+      height: 900,
+      updatedAt: "2026-03-03T00:00:00.000Z"
+    });
+    fetchMediaObjectMock.mockResolvedValue({
+      body: Buffer.from("hello world!"),
+      contentType: "image/jpeg",
+      contentLength: 12,
+      etag: '"media-1-etag"'
+    });
+
+    const app = await buildMediaRouteApp({
+      id: localIdentityFixtures.connected_viewer.seededUser?.id ?? "viewer-123",
+      handle: localIdentityFixtures.connected_viewer.seededUser?.handle ?? "fixture_author"
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/media/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(getMediaDeliveryTargetMock).toHaveBeenCalledWith({
+      mediaId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id ?? "viewer-123"
+    });
+    expect(fetchMediaObjectMock).toHaveBeenCalledWith({
+      bucket: "fixture-bucket",
+      key: "fixtures/test-core/adventures/fixture-falls.jpg",
+      region: "us-west-2"
+    });
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+    expect(response.headers.etag).toBe('"media-1-etag"');
+    expect(response.body).toBe("hello world!");
+
+    await app.close();
+  });
+
+  it("returns 304 when the client already has the current media etag", async () => {
+    getMediaDeliveryTargetMock.mockResolvedValue({
+      id: "media-1",
+      storageKey: "fixtures/test-core/adventures/fixture-falls.jpg",
+      mimeType: "image/jpeg",
+      byteSize: 12,
+      width: 1200,
+      height: 900,
+      updatedAt: "2026-03-03T00:00:00.000Z"
+    });
+    fetchMediaObjectMock.mockResolvedValue({
+      body: Buffer.from("hello world!"),
+      contentType: "image/jpeg",
+      contentLength: 12,
+      etag: '"media-1-etag"'
+    });
+
+    const app = await buildMediaRouteApp({
+      id: "viewer-123",
+      handle: "fixture_author"
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/media/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+      headers: {
+        "if-none-match": '"media-1-etag"'
+      }
+    });
+
+    expect(response.statusCode).toBe(304);
+    expect(response.headers.etag).toBe('"media-1-etag"');
+    expect(response.headers["cache-control"]).toBe("private, max-age=300");
+
+    await app.close();
   });
 
   it("allocates presigned uploads for authenticated viewers", async () => {

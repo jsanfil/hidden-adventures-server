@@ -5,11 +5,10 @@ import { env } from "../../config/env.js";
 import { db } from "../../db/client.js";
 import { requireAuthenticatedRequest } from "../auth/plugin.js";
 import { listOwnedMediaAssetsForAdventureCreate } from "../media/repository.js";
-import { checkMediaObjectExists, fetchMediaObject } from "../media/storage.js";
+import { checkMediaObjectExists } from "../media/storage.js";
 import {
   createAdventure,
   getAdventureById,
-  getMediaDeliveryTarget,
   listAdventureMedia,
   listFeed
 } from "./repository.js";
@@ -45,10 +44,6 @@ const feedQuerySchema = z.object({
 const detailQuerySchema = z.object({}).strict();
 
 const detailParamsSchema = z.object({
-  id: z.string().uuid()
-});
-
-const mediaParamsSchema = z.object({
   id: z.string().uuid()
 });
 
@@ -178,49 +173,6 @@ export async function adventureRoutes(app: FastifyInstance): Promise<void> {
     return {
       items
     };
-  });
-
-  app.get("/media/:id", async (request, reply) => {
-    const params = mediaParamsSchema.parse(request.params);
-    const media = await getMediaDeliveryTarget({
-      mediaId: params.id,
-      viewerId: request.authContext?.viewer?.id
-    });
-
-    if (!media) {
-      return reply.code(404).send({
-        error: "Media not found."
-      });
-    }
-
-    if (!env.S3_BUCKET) {
-      request.log.error("S3_BUCKET is required for media delivery.");
-      return reply.code(503).send({
-        error: "Media delivery is unavailable."
-      });
-    }
-
-    const object = await fetchMediaObject({
-      bucket: env.S3_BUCKET,
-      key: media.storageKey,
-      region: env.AWS_REGION
-    });
-
-    const etag = object.etag ?? `W/"${media.id}:${media.updatedAt}"`;
-    if (request.headers["if-none-match"] === etag) {
-      return reply
-        .code(304)
-        .header("etag", etag)
-        .header("cache-control", "private, max-age=300")
-        .send();
-    }
-
-    return reply
-      .header("content-type", object.contentType ?? media.mimeType ?? "application/octet-stream")
-      .header("cache-control", "private, max-age=300")
-      .header("etag", etag)
-      .header("content-length", object.contentLength ?? media.byteSize ?? object.body.length)
-      .send(object.body);
   });
 
   app.post("/adventures", async (request, reply) => {

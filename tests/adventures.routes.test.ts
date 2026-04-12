@@ -7,10 +7,8 @@ import { localIdentityFixtures } from "../src/features/auth/local-fixtures.js";
 const {
   dbMock,
   checkMediaObjectExistsMock,
-  fetchMediaObjectMock,
   createAdventureMock,
   getAdventureByIdMock,
-  getMediaDeliveryTargetMock,
   listAdventureMediaMock,
   listFeedMock
 } = vi.hoisted(() => ({
@@ -18,10 +16,8 @@ const {
     withTransaction: vi.fn()
   },
   checkMediaObjectExistsMock: vi.fn(),
-  fetchMediaObjectMock: vi.fn(),
   createAdventureMock: vi.fn(),
   getAdventureByIdMock: vi.fn(),
-  getMediaDeliveryTargetMock: vi.fn(),
   listAdventureMediaMock: vi.fn(),
   listFeedMock: vi.fn()
 }));
@@ -37,7 +33,6 @@ const { listOwnedMediaAssetsForAdventureCreateMock } = vi.hoisted(() => ({
 vi.mock("../src/features/adventures/repository.js", () => ({
   createAdventure: createAdventureMock,
   getAdventureById: getAdventureByIdMock,
-  getMediaDeliveryTarget: getMediaDeliveryTargetMock,
   listAdventureMedia: listAdventureMediaMock,
   listFeed: listFeedMock
 }));
@@ -47,8 +42,7 @@ vi.mock("../src/features/media/repository.js", () => ({
 }));
 
 vi.mock("../src/features/media/storage.js", () => ({
-  checkMediaObjectExists: checkMediaObjectExistsMock,
-  fetchMediaObject: fetchMediaObjectMock
+  checkMediaObjectExists: checkMediaObjectExistsMock
 }));
 
 vi.mock("../src/config/env.js", () => ({
@@ -97,10 +91,8 @@ describe("adventure routes", () => {
     createAdventureMock.mockReset();
     getAdventureByIdMock.mockReset();
     listAdventureMediaMock.mockReset();
-    getMediaDeliveryTargetMock.mockReset();
     listOwnedMediaAssetsForAdventureCreateMock.mockReset();
     checkMediaObjectExistsMock.mockReset();
-    fetchMediaObjectMock.mockReset();
   });
 
   it("requires auth for feed reads", async () => {
@@ -445,47 +437,6 @@ describe("adventure routes", () => {
         }
       ]
     });
-
-    await app.close();
-  });
-
-  it("streams media bytes for visible media ids", async () => {
-    getMediaDeliveryTargetMock.mockResolvedValue({
-      id: "media-1",
-      storageKey: "fixtures/test-core/adventures/fixture-falls.jpg",
-      mimeType: "image/jpeg",
-      byteSize: 12,
-      width: 1200,
-      height: 900,
-      updatedAt: "2026-03-03T00:00:00.000Z"
-    });
-    fetchMediaObjectMock.mockResolvedValue({
-      body: Buffer.from("hello world!"),
-      contentType: "image/jpeg",
-      contentLength: 12,
-      etag: '"media-1-etag"'
-    });
-
-    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/media/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(getMediaDeliveryTargetMock).toHaveBeenCalledWith({
-      mediaId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
-      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id
-    });
-    expect(fetchMediaObjectMock).toHaveBeenCalledWith({
-      bucket: "fixture-bucket",
-      key: "fixtures/test-core/adventures/fixture-falls.jpg",
-      region: "us-west-2"
-    });
-    expect(response.headers["content-type"]).toContain("image/jpeg");
-    expect(response.headers.etag).toBe('"media-1-etag"');
-    expect(response.body).toBe("hello world!");
 
     await app.close();
   });

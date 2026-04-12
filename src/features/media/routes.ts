@@ -5,12 +5,13 @@ import { z } from "zod";
 
 import { env } from "../../config/env.js";
 import { requireAuthenticatedRequest } from "../auth/plugin.js";
+import { getMediaDeliveryTarget, insertPendingMediaAssets } from "./repository.js";
 import {
   buildAdventureImageStorageKey,
+  fetchMediaObject,
   createPresignedUpload,
   normalizeAdventureImageMimeType
 } from "./storage.js";
-import { insertPendingMediaAssets } from "./repository.js";
 
 const uploadItemSchema = z.object({
   clientId: z.string().trim().min(1).max(128),
@@ -24,8 +25,55 @@ const uploadRequestSchema = z.object({
   items: z.array(uploadItemSchema).min(1).max(20)
 }).strict();
 
+const mediaParamsSchema = z.object({
+  id: z.string().uuid()
+});
+
 export async function mediaRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuthenticatedRequest);
+
+  app.get("/media/:id", async (request, reply) => {
+    const params = mediaParamsSchema.parse(request.params);
+    const media = await getMediaDeliveryTarget({
+      mediaId: params.id,
+      viewerId: request.authContext?.viewer?.id
+    });
+
+    if (!media) {
+      return reply.code(404).send({
+        error: "Media not found."
+      });
+    }
+
+    if (!env.S3_BUCKET) {
+      request.log.error("S3_BUCKET is required for media delivery.");
+      return reply.code(503).send({
+        error: "Media delivery is unavailable."
+      });
+    }
+
+    const object = await fetchMediaObject({
+      bucket: env.S3_BUCKET,
+      key: media.storageKey,
+      region: env.AWS_REGION
+    });
+
+    const etag = object.etag ?? `W/"${media.id}:${media.updatedAt}"`;
+    if (request.headers["if-none-match"] === etag) {
+      return reply
+        .code(304)
+        .header("etag", etag)
+        .header("cache-control", "private, max-age=300")
+        .send();
+    }
+
+    return reply
+      .header("content-type", object.contentType ?? media.mimeType ?? "application/octet-stream")
+      .header("cache-control", "private, max-age=300")
+      .header("etag", etag)
+      .header("content-length", object.contentLength ?? media.byteSize ?? object.body.length)
+      .send(object.body);
+  });
 
   app.post("/media/adventure-uploads", async (request, reply) => {
     const viewer = request.authContext?.viewer;
