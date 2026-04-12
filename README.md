@@ -34,7 +34,7 @@ When a route, payload, validation rule, or default response behavior changes, up
 
 The Docker dev app now re-syncs `node_modules` on boot whenever `package.json` or `package-lock.json` changes, which prevents stale named-volume dependencies from leaving the server container up while the app process crashes.
 
-Non-production now defaults to `AUTH_MODE=test_jwt`, which is the local automation path. Manual QA uses `AUTH_MODE=cognito` with a dedicated non-prod Cognito pool and the `hidden_adventures_qa` database. Production must run with `AUTH_MODE=cognito`.
+Non-production now defaults to `AUTH_MODE=test_jwt`, which is the local automation path. Manual QA uses `AUTH_MODE=cognito` with a dedicated non-prod Cognito pool and the `hidden_adventures_nonprod` database. Production must run with `AUTH_MODE=cognito`.
 
 ## Deployment Baseline
 
@@ -98,7 +98,7 @@ Notes:
 - `GET /api/health` remains public for readiness and Docker health checks.
 - All other current `/api` routes require `Authorization: Bearer <token>`.
 - In local automation mode (`AUTH_MODE=test_jwt`), mint deterministic tokens with `npm run fixtures:mint-test-token -- --pack test-core --persona <persona-key>`.
-- In local mobile-app manual QA mode (`AUTH_MODE=cognito`), use the dedicated non-prod Cognito pool and the `hidden_adventures_qa` database.
+- In local mobile-app manual QA mode (`AUTH_MODE=cognito`), use the dedicated non-prod Cognito pool and the `hidden_adventures_nonprod` database.
 - In production (`NODE_ENV=production`), the server fails fast unless `AUTH_MODE=cognito`.
 - `viewerHandle` is no longer part of the public request contract.
 - feed cards keep using `primaryMedia.id`; clients must not treat `storageKey` as a delivery URL.
@@ -128,7 +128,7 @@ Notes:
 ## Mobile App Manual QA Backend Prep
 
 1. Start Docker and Postgres with `docker compose up --build`.
-2. Create and migrate the QA database with `npm run db:create:qa` and `npm run db:migrate:qa`.
+2. Create and migrate the manual-QA database with `npm run db:create:qa` and `npm run db:migrate:qa`.
    If the DB was already migrated before this refactor, run `npm run db:reset:qa` first so the rewritten base migrations apply cleanly.
 3. Validate and verify the fixture pack:
    - `npm run fixtures:validate -- --pack qa-rich`

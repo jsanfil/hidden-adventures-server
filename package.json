@@ -45,6 +45,8 @@
     "migration:transform-stage": "tsx src/scripts/transform-stage-to-work.ts",
     "migration:publish-run": "tsx src/scripts/publish-run.ts",
     "migration:link-cognito": "tsx src/scripts/link-cognito-users.ts",
+    "migration:namespace-media-assets": "tsx src/scripts/namespace-media-assets.ts",
+    "migration:clear-missing-profile-media": "tsx src/scripts/clear-missing-profile-media.ts",
     "smoke:staging": "sh deploy/smoke/staging-smoke.sh"
   },
   "dependencies": {

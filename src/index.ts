@@ -9,7 +9,9 @@ async function main() {
       {
         runtimeMode: env.SERVER_RUNTIME_MODE,
         authMode: env.AUTH_MODE,
-        database: env.POSTGRES_DB
+        database: env.POSTGRES_DB,
+        s3Bucket: env.S3_BUCKET,
+        cognitoUserPoolId: env.COGNITO_USER_POOL_ID
       },
       "Starting Hidden Adventures server."
     );
