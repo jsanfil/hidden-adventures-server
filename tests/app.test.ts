@@ -600,6 +600,47 @@ describe("buildApp", () => {
     await app.close();
   });
 
+  it("returns authenticated media bytes for profile avatars", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            media_id: "avatar-1",
+            storage_key: "profile-avatars/avatar-1.jpg",
+            mime_type: "image/jpeg",
+            byte_size: 12,
+            width: 512,
+            height: 512,
+            updated_at: "2026-03-03T00:00:00.000Z"
+          }
+        ]
+      } as QueryRows<Record<string, unknown>>);
+    fetchMediaObjectMock.mockResolvedValue({
+      body: Buffer.from("avatar-bytes"),
+      contentType: "image/jpeg",
+      contentLength: 12,
+      etag: '"avatar-etag"'
+    });
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/media/f62dfe1e-4525-5dea-addf-5ad4ccb43108",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+    expect(response.headers.etag).toBe('"avatar-etag"');
+    expect(response.body).toBe("avatar-bytes");
+
+    await app.close();
+  });
+
   it("returns profile data and visible authored adventures", async () => {
     dbMock.query
       .mockResolvedValueOnce({

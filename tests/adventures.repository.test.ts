@@ -274,6 +274,41 @@ describe("adventures repository", () => {
     );
   });
 
+  it("returns profile-linked media delivery targets", async () => {
+    dbMock.query.mockResolvedValue({
+      rows: [
+        {
+          media_id: "avatar-1",
+          storage_key: "profile-avatars/avatar-1.jpg",
+          mime_type: "image/jpeg",
+          byte_size: 1024,
+          width: 512,
+          height: 512,
+          updated_at: "2026-03-03T00:00:00.000Z"
+        }
+      ]
+    });
+
+    const result = await getMediaDeliveryTarget({
+      mediaId: "f62dfe1e-4525-5dea-addf-5ad4ccb43108",
+      viewerId: "viewer-123"
+    });
+
+    expect(result).toEqual({
+      id: "avatar-1",
+      storageKey: "profile-avatars/avatar-1.jpg",
+      mimeType: "image/jpeg",
+      byteSize: 1024,
+      width: 512,
+      height: 512,
+      updatedAt: "2026-03-03T00:00:00.000Z"
+    });
+    expect(dbMock.query).toHaveBeenCalledWith(
+      expect.stringContaining("from public.profiles profiles"),
+      ["viewer-123", "f62dfe1e-4525-5dea-addf-5ad4ccb43108"]
+    );
+  });
+
   it("creates an adventure and ordered media rows in one transaction", async () => {
     const client = {
       query: vi.fn()

@@ -105,7 +105,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - params:
   - `id`: UUID
 - response:
-  - `200` with image bytes when the media belongs to a visible published adventure
+  - `200` with image bytes when the media belongs to a visible published adventure or is linked as a profile avatar or cover
   - `304` when `If-None-Match` matches the current ETag
   - `404` with `{ error: "Media not found." }` when missing or not visible
   - `503` with `{ error: "Media delivery is unavailable." }` when S3 delivery is not configured

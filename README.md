@@ -106,7 +106,7 @@ Notes:
 - `GET /api/feed` defaults to recent ordering when geo scope is absent, and also when geo scope is present but `sort` is omitted.
 - `GET /api/feed?sort=distance` requires geo scope.
 - `GET /api/adventures/:id/media` returns the ordered media references for detail carousels.
-- `GET /api/media/:id` is the authenticated byte-delivery route for feed and detail images and keeps S3 details server-side.
+- `GET /api/media/:id` is the authenticated byte-delivery route for adventure images and profile-linked media, and keeps S3 details server-side.
 - the current Slice 1 profile-write surface is limited to `GET /api/me/profile` and `PUT /api/me/profile`; handle creation remains on `POST /api/auth/handle`
 - no other Slice 1 API routes are currently locked or blessed for client integration
 

@@ -427,15 +427,26 @@ export async function getMediaDeliveryTarget(options: {
         media_assets.height,
         media_assets.updated_at::text as updated_at
       from public.media_assets media_assets
-      join public.adventure_media adventure_media
-        on adventure_media.media_asset_id = media_assets.id
-      join public.adventures adventures
-        on adventures.id = adventure_media.adventure_id
       where media_assets.id = $2::uuid
         and media_assets.deleted_at is null
-        and adventures.status = 'published'
-        and ${visibilityClause()}
-      order by adventure_media.is_primary desc, adventure_media.sort_order asc
+        and media_assets.moderation_status <> 'rejected'
+        and (
+          exists (
+            select 1
+            from public.adventure_media adventure_media
+            join public.adventures adventures
+              on adventures.id = adventure_media.adventure_id
+            where adventure_media.media_asset_id = media_assets.id
+              and adventures.status = 'published'
+              and ${visibilityClause()}
+          )
+          or exists (
+            select 1
+            from public.profiles profiles
+            where profiles.avatar_media_asset_id = media_assets.id
+               or profiles.cover_media_asset_id = media_assets.id
+          )
+        )
       limit 1
     `,
     [options.viewerId ?? null, options.mediaId]
