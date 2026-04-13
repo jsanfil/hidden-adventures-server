@@ -75,6 +75,9 @@ FROM public.connections
 ON CONFLICT (grantor_user_id, grantee_user_id) DO NOTHING;
 
 ALTER TABLE public.adventures
+  ALTER COLUMN visibility DROP DEFAULT;
+
+ALTER TABLE public.adventures
   ALTER COLUMN visibility TYPE TEXT;
 
 UPDATE public.adventures
@@ -88,6 +91,9 @@ CREATE TYPE public.adventure_visibility AS ENUM ('private', 'sidekicks', 'public
 ALTER TABLE public.adventures
   ALTER COLUMN visibility TYPE public.adventure_visibility
   USING visibility::text::public.adventure_visibility;
+
+ALTER TABLE public.adventures
+  ALTER COLUMN visibility SET DEFAULT 'private'::public.adventure_visibility;
 
 DROP TYPE public.adventure_visibility_old;
 
