@@ -37,7 +37,8 @@ export function resolveLocalBackupDir(
 
 export function buildBackupFilePath(backupDir: string, date = new Date()): string {
   const timestamp = date.toISOString().replace(/[:.]/g, "-");
-  return path.join(backupDir, `hidden-adventures-local-${timestamp}.dump`);
+  const databaseName = env.POSTGRES_DB || "unknown-database";
+  return path.join(backupDir, `hidden-adventures-${databaseName}-${timestamp}.dump`);
 }
 
 function parseArgs(argv: string[]): CliOptions {

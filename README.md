@@ -2,225 +2,350 @@
 
 TypeScript backend for the Hidden Adventures rebuild.
 
-## Contract Source
+This README is intentionally repo-local and operational. It explains how to run the server, which environments exist, what each script does, and how the legacy MongoDB migration pipeline works. Product planning, feature sequencing, and delivery status live in the sibling `hidden-adventures-plan` repo, not here.
 
-The canonical API contract lives in [docs/contract.md](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/docs/contract.md).
+## Contract And Source Of Truth
 
-When a route, payload, validation rule, or default response behavior changes, update both the Vitest coverage and `docs/contract.md` in the same change.
+- API contract: [docs/contract.md](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/docs/contract.md)
+- Deployment baseline: [deploy/README.md](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/deploy/README.md)
+- Schema migrations: [db/migrations](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/db/migrations)
 
-## Goals
+When route behavior, payload shape, validation, or default behavior changes, update Vitest coverage and `docs/contract.md` in the same change.
 
-- relational domain model with PostgreSQL + PostGIS
-- hybrid API with clean resources plus workflow and query endpoints
-- local-first Docker development
-- cheap production deployment on AWS Lightsail
-- repeatable staging and deployment baseline for Slice 1 server rollout
+## What This Repo Contains
 
-## Getting Started
+- Fastify API server
+- PostgreSQL + PostGIS schema and migrations
+- local automation and manual-QA workflows
+- fixture packs for disposable automation data
+- archive import tooling for legacy MongoDB data
+- deployment and smoke-test assets
 
-1. Install dependencies with `npm install`.
-2. Start the local stack with `docker compose up --build`.
-3. Create the local databases:
-   - `npm run db:create:qa`
-   - `npm run db:create:test`
-4. Migrate the local databases:
-   - `npm run db:migrate:qa`
-   - `npm run db:migrate:test`
-   - after this adventure-description refactor lands, reset and recreate any already-migrated local DB before rerunning migrations
-5. Choose a local mode:
-   - mobile app manual QA backend prep: `npm run fixtures:validate -- --pack qa-rich`, `npm run fixtures:verify-media -- --pack qa-rich`, `npm run fixtures:provision-cognito -- --pack qa-rich`, `npm run fixtures:seed-db -- --pack qa-rich`, then `npm run dev:manual-qa`
-   - automated server regression: `npm run test:regression`
-6. Run the app locally with the mode-specific env file and start script if you want to iterate outside Docker.
+## Environment Model
 
-The Docker dev app now re-syncs `node_modules` on boot whenever `package.json` or `package-lock.json` changes, which prevents stale named-volume dependencies from leaving the server container up while the app process crashes.
+This repo uses three explicit environments.
 
-Non-production now defaults to `AUTH_MODE=test_jwt`, which is the local automation path. Manual QA uses `AUTH_MODE=cognito` with a dedicated non-prod Cognito pool and the `hidden_adventures_nonprod` database. Production must run with `AUTH_MODE=cognito`.
+### 1. Automation Testing
 
-## Deployment Baseline
+- env file: `.env.local.automation`
+- database: `hidden_adventures_test`
+- auth mode: `test_jwt`
+- data model: disposable and fully scripted
+- use this for regression testing, fixture seeding, and automated local development
 
-Deployment-oriented artifacts now live in `deploy/`:
+### 2. Manual QA
 
-- `Dockerfile.deploy`: production-style server image that builds TypeScript once and runs `node dist/index.js`
-- `deploy/README.md`: image versioning, environment and secrets expectations, rollout and rollback steps, and the staging smoke path
-- `deploy/env/*.example`: staging and production runtime variable templates
-- `deploy/docker-compose.staging.yml`: minimal single-service compose example for a staging host using an external PostgreSQL database
-- `deploy/smoke/staging-smoke.sh`: repeatable smoke checks for the current Slice 1 server surface
+- env file: `.env.local.manual-qa`
+- database: `hidden_adventures_nonprod`
+- auth mode: `cognito`
+- data model: persistent and forward-migrated
+- use this for real manual testing against preserved migrated data
+- do not reseed this database from fixture packs
 
-Helpful deployment commands:
+### 3. Production
 
-- `docker build -f Dockerfile.deploy -t hidden-adventures-server:$(git rev-parse --short HEAD) .`
-- `npm run db:migrate:dist`
-- `BASE_URL=https://your-staging-host npm run smoke:staging`
+- env file: `.env.prod`
+- database: `hidden_adventures_prod`
+- auth mode: `cognito`
+- data model: future persistent production environment
+- use this only with explicit production commands
 
-## Verified Local Commands
+### Important Safety Rule
 
-- `docker compose up --build -d`
-- `npm run db:create:qa`
-- `npm run db:create:test`
-- `npm run db:migrate:qa`
-- `npm run db:migrate:test`
-- `npm run fixtures:validate -- --pack test-core`
-- `npm run fixtures:seed-db -- --pack test-core`
-- `npm run fixtures:mint-test-token -- --pack test-core --persona connected_viewer`
-- `docker compose ps`
-- `docker compose exec -T app wget -qO- http://127.0.0.1:3000/`
-- `docker compose exec -T app wget -qO- http://127.0.0.1:3000/api/health`
-- `docker compose down`
+The repo-root `.env` file is intentionally blanked out. It is a fail-fast trap, not a working environment. If a script accidentally falls back to `.env`, it should fail instead of silently writing to the wrong database, Cognito pool, or S3 bucket.
 
-## Testing
+## Prerequisites
+
+- Node.js 22+
+- Docker Desktop
+- npm
+
+Install dependencies:
+
+```sh
+npm install
+```
+
+Start the local Docker stack:
+
+```sh
+docker compose up --build -d
+```
+
+## Quick Start
+
+### Automation Testing Setup
+
+Create the automation database:
+
+```sh
+npm run db:create:test
+```
+
+Run schema migrations:
+
+```sh
+npm run db:migrate:test
+```
+
+Seed the disposable `test-core` dataset:
+
+```sh
+npm run fixtures:validate:test -- --pack test-core
+npm run fixtures:seed-db:test -- --pack test-core
+```
+
+Run the test suite:
+
+```sh
+npm test
+```
+
+Run the full disposable regression loop:
+
+```sh
+npm run test:regression
+```
+
+Or force a clean rebuild of the test database first:
+
+```sh
+npm run test:regression:clean
+```
+
+Start the server in automation mode:
+
+```sh
+npm run dev:automation
+```
+
+### Manual QA Setup
+
+Create the manual-QA database once if needed:
+
+```sh
+npm run db:create:qa
+```
+
+Run schema migrations against the persistent manual-QA database:
+
+```sh
+npm run db:migrate:qa
+```
+
+Start the server in manual-QA mode:
+
+```sh
+npm run dev:manual-qa
+```
+
+Important:
+
+- `hidden_adventures_nonprod` is meant to be preserved
+- do not run fixture reseed workflows against manual QA
+- manual QA should move forward by SQL migrations and legacy-data import/publish workflows only
+
+## Script Reference
+
+### Server Runtime
+
+- `npm run dev:automation`
+  Runs the server with `.env.local.automation`
+
+- `npm run dev:manual-qa`
+  Runs the server with `.env.local.manual-qa`
+
+- `npm run build`
+  Compiles TypeScript to `dist/`
+
+- `npm start`
+  Runs `dist/index.js`
+
+- `npm run check`
+  Runs TypeScript typechecking without emitting files
 
 - `npm test`
-- `npm run check`
-- `npm run build`
+  Runs the Vitest suite
 
-The current suite covers the shipped Slice 1 read surface, auth bootstrap and handle selection behavior, repository mapping, and request validation. Read-route tests explicitly reject the retired `viewerHandle` query-param pattern.
+### Database Lifecycle
 
-## Initial Runtime Shape
+- `npm run db:create:test`
+  Creates `hidden_adventures_test` if missing
 
-- `app`: Fastify-based API service
-- `postgres`: PostgreSQL 16 with PostGIS enabled via a repo-local ARM-native image build
+- `npm run db:migrate:test`
+  Applies all pending SQL migrations to `hidden_adventures_test`
 
-## Current Implemented API Surface
+- `npm run db:reset:test`
+  Drops and recreates `hidden_adventures_test`
 
-- `GET /api/health`
-- `GET /api/auth/bootstrap`
-- `POST /api/auth/handle`
-- `GET /api/feed`
-- `GET /api/adventures/:id`
-- `GET /api/adventures/:id/media`
-- `GET /api/media/:id`
-- `GET /api/profiles/:handle`
-- `GET /api/me/profile`
-- `PUT /api/me/profile`
+- `npm run db:create:qa`
+  Creates `hidden_adventures_nonprod` if missing
+
+- `npm run db:migrate:qa`
+  Applies all pending SQL migrations to `hidden_adventures_nonprod`
+
+- `npm run db:migrate:prod`
+  Applies all pending SQL migrations to `hidden_adventures_prod` using `.env.prod`
 
 Notes:
 
-- `GET /api/health` remains public for readiness and Docker health checks.
-- All other current `/api` routes require `Authorization: Bearer <token>`.
-- In local automation mode (`AUTH_MODE=test_jwt`), mint deterministic tokens with `npm run fixtures:mint-test-token -- --pack test-core --persona <persona-key>`.
-- In local mobile-app manual QA mode (`AUTH_MODE=cognito`), use the dedicated non-prod Cognito pool and the `hidden_adventures_nonprod` database.
-- In production (`NODE_ENV=production`), the server fails fast unless `AUTH_MODE=cognito`.
-- `viewerHandle` is no longer part of the public request contract.
-- feed cards keep using `primaryMedia.id`; clients must not treat `storageKey` as a delivery URL.
-- `GET /api/feed` supports optional geo scope with `latitude`, `longitude`, and `radiusMiles`.
-- `GET /api/feed` defaults to recent ordering when geo scope is absent, and also when geo scope is present but `sort` is omitted.
-- `GET /api/feed?sort=distance` requires geo scope.
-- `GET /api/adventures/:id/media` returns the ordered media references for detail carousels.
-- `GET /api/media/:id` is the authenticated byte-delivery route for adventure images and profile-linked media, and keeps S3 details server-side.
-- the current Slice 1 profile-write surface is limited to `GET /api/me/profile` and `PUT /api/me/profile`; handle creation remains on `POST /api/auth/handle`
-- no other Slice 1 API routes are currently locked or blessed for client integration
+- there is no `db:reset:qa`
+- manual QA is intentionally not a disposable reset/reseed environment
+- there is no generic “safe” `db:migrate` alias for local workflows; use the explicit environment-specific commands
 
-## Local Modes and Fixture Packs
+### Backups
 
-- The local server supports two explicit modes:
-  - `local-manual-qa` via `.env.local.manual-qa` and `npm run dev:manual-qa`
-  - `local-automation-test-core` via `.env.local.automation` and `npm run dev:automation`
-- One local Postgres container hosts two logical databases:
-  - `hidden_adventures_qa`
-  - `hidden_adventures_test`
-- Fixture data now lives in manifest packs under `fixtures/packs/`, not in server auth source files.
-- The fixture packs are:
-  - `qa-rich`: rich mobile-app manual QA dataset for `hidden_adventures_qa`
-  - `test-core`: deterministic regression dataset for `hidden_adventures_test`
-- Seed commands fail fast if the pack does not match the current target database.
-- The legacy `local_identity` fixture code remains temporarily supported for compatibility tests, but it is no longer the default non-production workflow.
+- `npm run db:backup:test`
+  Backs up `hidden_adventures_test`
 
-## Mobile App Manual QA Backend Prep
+- `npm run db:backup:qa`
+  Backs up `hidden_adventures_nonprod`
 
-1. Start Docker and Postgres with `docker compose up --build`.
-2. Create and migrate the manual-QA database with `npm run db:create:qa` and `npm run db:migrate:qa`.
-   If the DB was already migrated before this refactor, run `npm run db:reset:qa` first so the rewritten base migrations apply cleanly.
-3. Validate and verify the fixture pack:
-   - `npm run fixtures:validate -- --pack qa-rich`
-   - `npm run fixtures:verify-media -- --pack qa-rich`
-4. Provision or reconcile the QA personas in the non-prod Cognito pool:
-   - `npm run fixtures:provision-cognito -- --pack qa-rich`
-5. Seed the QA database:
-   - `npm run fixtures:seed-db -- --pack qa-rich`
-6. Start the server:
-   - `npm run dev:manual-qa`
-7. Launch the iOS app in its `LocalManualQA` scheme and use this backend as the app-test target.
+- `npm run db:backup:prod`
+  Backs up `hidden_adventures_prod`
 
-This workflow prepares a realistic backend for manual mobile-app testing. It is not the server regression path.
+Backup files include the active database name in the output filename.
 
-## Automated Server Regression Workflow
+### Fixture Workflows
 
-1. Run `npm run test:regression` for the normal edit and test loop.
-2. Run `npm run test:regression:clean` when you want a full database rebuild before tests.
-   After the base-migration rewrite for adventure descriptions, prefer the clean path until your local test DB has been rebuilt once.
-3. Use `npm run dev:automation` only when you want to point another client or harness at the local automation server outside the Vitest flow.
+These scripts are for disposable automation data, not manual QA.
 
-## Current Data And Identity Snapshot
+- `npm run fixtures:validate:test -- --pack test-core`
+  Validates the `test-core` fixture pack against the automation environment
 
-- Server migration tooling can stage the legacy Mongo archive, transform it into normalized work tables, publish a selected import run into the real `public` tables, and emit reconciliation reports.
-- Import run `2` is currently published from the canonical archive.
-- Imported legacy profiles are linked locally to Cognito by exact handle with `2598` linked legacy users and `1383` extra Cognito accounts intentionally left unmatched.
-- Bulk reconciliation is intentionally handle-first for migration; verified-email matching remains a runtime bootstrap and recovery path.
+- `npm run fixtures:seed-db:test -- --pack test-core`
+  Replaces the contents of the public app tables in `hidden_adventures_test` with the `test-core` fixture pack
 
-## Current Priority
+- `npm run db:seed:local-fixtures:test`
+  Seeds the older local fixture helper path into the automation environment only
 
-- lock contract documentation from the implemented response shapes
-- keep the Vitest suite as the authoritative server verification path for Slice 1
-- keep the Postman repo current for manual troubleshooting and API exploration
-- support the iOS thread as it replaces fixture-backed services with real network integration
-- define the first staging, deploy, and rollback baseline
+- `npm run fixtures:mint-test-token -- --pack test-core --persona <persona-key>`
+  Mints a deterministic JWT for automation/local testing
 
-## Migration Tooling
+Important:
 
-Run the first server-side SQL migration set:
+- fixture seed scripts are destructive
+- they delete and recreate public app data in the target database
+- they should only be used against `hidden_adventures_test`
 
-- `npm run db:migrate`
+### Legacy Migration Pipeline
 
-Stage the legacy Mongo archive into the raw migration tables:
+These scripts are for rebuilding an environment from the legacy MongoDB archive and related Cognito exports.
 
-- `POSTGRES_HOST=127.0.0.1 npm run migration:stage-archive -- --archive ../hidden-adventures-plan/migration/archives/legacy-mongodb-backup-2026-03-01.archive --report /tmp/ha-stage-report.json`
+- `npm run migration:stage-archive`
+  Stages raw archive documents into `migration_stage.*`
 
-Export the original Cognito pool into a local timestamped JSON artifact outside git:
+- `npm run migration:transform-stage`
+  Converts staged legacy data into normalized `migration_work.*` rows and writes a report
+
+- `npm run migration:publish-run`
+  Replaces the public application tables from one transformed import run and writes a reconciliation report
 
 - `npm run migration:export-cognito`
+  Exports Cognito users to a local backup JSON file
 
-The export is written to:
+- `npm run migration:link-cognito`
+  Links imported legacy users to Cognito users in the work tables
 
-- `~/.hidden-adventures/backups/cognito/cognito-users-<pool-id>-<timestamp>.json`
+- `npm run migration:namespace-media-assets`
+  Rewrites/normalizes legacy media storage key namespaces
 
-Transform staged raw rows into normalized work tables:
+- `npm run migration:clear-missing-profile-media`
+  Clears broken/missing profile media references
 
-- `POSTGRES_HOST=127.0.0.1 npm run migration:transform-stage -- --run-id 2 --report /tmp/ha-transform-report.json`
+## Fixture Packs
 
-Publish a transformed run into the real `public` application tables and emit a reconciliation report:
+Fixture manifests live under [fixtures/packs](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/fixtures/packs).
 
-- `POSTGRES_HOST=127.0.0.1 npm run migration:publish-run -- --run-id 2 --report /tmp/ha-publish-report.json`
+Current packs:
 
-Run the username-first Cognito linking job against a staged import run:
+- `test-core`
+  Deterministic automation dataset for `hidden_adventures_test`
 
-- `POSTGRES_HOST=127.0.0.1 npm run migration:link-cognito -- --input /absolute/path/to/cognito-users.json --run-id 1 --report /tmp/cognito-link-report.json`
+- `qa-rich`
+  Rich non-production fixture dataset retained for disposable or exploratory use, but not part of the normal persistent manual-QA workflow
+
+Even though `qa-rich` still exists in the repo, the normal manual-QA environment is the persisted `hidden_adventures_nonprod` database, not a fixture-reseeded copy.
+
+## Legacy Import Workflow
+
+Use the migration pipeline when you need to build an environment from the archived MongoDB data rather than fixture packs.
+
+### Step 1: Export Cognito Users
+
+```sh
+npm run migration:export-cognito
+```
+
+The export is written outside git, typically under:
+
+```text
+~/.hidden-adventures/backups/cognito/
+```
+
+### Step 2: Stage The MongoDB Archive
+
+Example:
+
+```sh
+POSTGRES_HOST=127.0.0.1 \
+npm run migration:stage-archive -- \
+  --archive ../hidden-adventures-plan/migration/archives/legacy-mongodb-backup-2026-03-01.archive \
+  --report /tmp/ha-stage-report.json
+```
+
+This creates a new `migration_meta.import_runs` row and loads raw collections into `migration_stage`.
+
+### Step 3: Transform Staged Data
+
+Example:
+
+```sh
+POSTGRES_HOST=127.0.0.1 \
+npm run migration:transform-stage -- \
+  --run-id 2 \
+  --report /tmp/ha-transform-report.json
+```
+
+This reads:
+
+- `migration_stage.profiles_raw`
+- `migration_stage.adventures_raw`
+- `migration_stage.sidekicks_raw`
+- `migration_stage.favorites_raw`
+- `migration_stage.comments_raw`
+
+and writes normalized work rows to `migration_work.*`.
+
+### Step 4: Link Cognito Users
+
+Example:
+
+```sh
+POSTGRES_HOST=127.0.0.1 \
+npm run migration:link-cognito -- \
+  --input /absolute/path/to/cognito-users.json \
+  --run-id 2 \
+  --report /tmp/ha-cognito-link-report.json
+```
 
 Notes:
 
-- the archive staging job creates a new `migration_meta.import_runs` row, loads the raw collection payloads into `migration_stage`, and records collection counts in `migration_meta.import_metrics`
-- the transform job currently covers `profiles_raw`, `adventures_raw`, `sidekicks_raw`, `favorites_raw`, and `comments_raw` into the corresponding `migration_work` tables plus import audit rows for skipped or collapsed legacy records
-- the transform job intentionally excludes the 29 historically-approved zero-activity duplicate legacy profiles and records them as `profiles.excluded_profile`
-- the publish job currently replaces the data in the `public` application tables from a chosen migration run and writes a reconciliation report comparing work-table counts to published counts
-- the linking job expects a Cognito export JSON shaped either as an array of users or an object with a `Users` array
-- dry-run is the default; add `--apply` to persist `cognito_subject` links and audit rows
-- matching order is existing Cognito subject first, then exact Cognito username to legacy `handle`; bulk sync does not auto-link by email
-- in apply mode, the linking job now fails if the number of updated `users_work` rows does not match the number of linkable Cognito users
-- read endpoints now resolve the viewer from the authenticated bearer token and use local `users.id` for visibility decisions
-- `handle` is the public username shown in the app and used for profile lookup; it is not the authenticated identity key
-- `displayName` is the optional friendly profile label and can differ from `handle`
+- dry-run is the default
+- add `--apply` to persist `cognito_subject` links in the work tables
 
-### Trusted local rebuild sequence
+### Step 5: Publish The Run
 
-When rebuilding the canonical local `hidden_adventures` database from scratch:
+Example:
 
-1. `npm run db:backup:local`
-2. `npm run migration:export-cognito`
-3. `POSTGRES_HOST=127.0.0.1 node --env-file=.env --import tsx ./src/scripts/db-reset-local-database.ts`
-4. `POSTGRES_HOST=127.0.0.1 node --env-file=.env --import tsx ./src/scripts/run-migrations.ts`
-5. `POSTGRES_HOST=127.0.0.1 npm run migration:stage-archive -- --archive ../hidden-adventures-plan/migration/archives/legacy-mongodb-backup-2026-03-01.archive --report /tmp/ha-stage-report.json`
-6. `POSTGRES_HOST=127.0.0.1 npm run migration:transform-stage -- --run-id <RUN_ID> --report /tmp/ha-transform-report.json`
-7. `POSTGRES_HOST=127.0.0.1 npm run migration:link-cognito -- --input ~/.hidden-adventures/backups/cognito/cognito-users-<pool-id>-<timestamp>.json --run-id <RUN_ID> --apply --report /tmp/ha-cognito-link-report.json`
-8. `POSTGRES_HOST=127.0.0.1 npm run migration:publish-run -- --run-id <RUN_ID> --report /tmp/ha-publish-report.json`
+```sh
+POSTGRES_HOST=127.0.0.1 \
+npm run migration:publish-run -- \
+  --run-id 2 \
+  --report /tmp/ha-publish-report.json
+```
+
+This replaces the public application tables from the chosen import run and writes a publish report comparing work-table counts to published counts.
 
 Expected published counts after the canonical rebuild:
 
@@ -233,3 +358,123 @@ Expected published counts after the canonical rebuild:
 - `media_assets`: `1839`
 - `adventure_media`: `352`
 - `adventure_stats`: `352`
+
+
+## Recommended Environment Workflows
+
+### Automation
+
+Use when:
+
+- running Vitest
+- checking request/response contract behavior
+- seeding known deterministic users and adventures
+- exercising auth with local signed test tokens
+
+Recommended flow:
+
+```sh
+npm run db:create:test
+npm run db:migrate:test
+npm run fixtures:validate:test -- --pack test-core
+npm run fixtures:seed-db:test -- --pack test-core
+npm test
+```
+
+### Manual QA
+
+Use when:
+
+- manually testing the app against preserved migrated data
+- validating real profile/adventure behavior on a fuller dataset
+- checking Cognito-backed login flows in non-production
+
+Recommended flow:
+
+```sh
+npm run db:backup:qa
+npm run db:migrate:qa
+npm run dev:manual-qa
+```
+
+Do not:
+
+- run fixture reseeds
+- wipe rows casually
+- treat `hidden_adventures_nonprod` as disposable
+
+### Production Bootstrap
+
+When the production environment is created later, the intended model is:
+
+1. use `.env.prod`
+2. create or point at `hidden_adventures_prod`
+3. run schema migrations
+4. stage/transform/publish the legacy archive into `hidden_adventures_prod`
+5. from that point on, move forward with ordinary SQL migrations only
+
+## Current API Surface
+
+For the current implemented contract, see [docs/contract.md](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/docs/contract.md).
+
+At a high level, the current server includes:
+
+- health
+- auth bootstrap and handle claim
+- feed
+- adventure detail and ordered media
+- authenticated media delivery
+- profile read/update
+- sidekick discovery, search, and management
+
+All business routes except `GET /api/health` require bearer auth.
+
+## Local Development Notes
+
+- The Docker dev stack uses PostgreSQL 16 with PostGIS.
+- The app process reads env from the explicit script-provided env file, not from planning docs.
+- The root `.env` file should not be used for local work.
+- `AUTH_MODE=test_jwt` is the automation path.
+- `AUTH_MODE=cognito` is required for manual QA and production.
+
+## Deployment Notes
+
+Deployment-oriented assets live under [deploy](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/deploy).
+
+Useful entrypoints:
+
+- [deploy/README.md](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/deploy/README.md)
+- [Dockerfile.deploy](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/Dockerfile.deploy)
+- [deploy/env/production.env.example](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/deploy/env/production.env.example)
+- [deploy/smoke/staging-smoke.sh](/Users/josephsanfilippo/Documents/projects/hidden-adventures-rebuild/hidden-adventures-server/deploy/smoke/staging-smoke.sh)
+
+## Verification
+
+Common checks:
+
+```sh
+npm run check
+npm test
+npm run build
+docker compose ps
+```
+
+## Repo Boundaries
+
+This repo is responsible for:
+
+- backend code
+- migrations
+- local environments and scripts
+- fixture packs
+- legacy import tooling
+- deployment assets
+
+This repo is not the source of truth for:
+
+- product roadmap
+- feature sequencing
+- milestone tracking
+- cross-repo planning status
+
+Those live in `hidden-adventures-plan`.

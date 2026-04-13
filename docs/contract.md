@@ -262,7 +262,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 
 - `GET /api/health` is public; all other current `/api` routes require bearer auth.
 - Local automation runs with `AUTH_MODE=test_jwt` and deterministic signed test tokens minted from the `test-core` fixture pack.
-- Local manual QA runs with `AUTH_MODE=cognito` against a dedicated non-prod Cognito pool and the `qa-rich` fixture pack.
+- Local manual QA runs with `AUTH_MODE=cognito` against the persistent `hidden_adventures_nonprod` database and a dedicated non-prod Cognito pool.
 - Production must run with `AUTH_MODE=cognito`.
 - Connected-viewer behavior comes only from authenticated auth context; there is no supported handle-based viewer override.
 - Invalid bearer tokens are rejected with `401` and `{ error: "Invalid authentication token." }`.
@@ -299,6 +299,8 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 ## Current Documentation Notes
 
 - The iOS app should continue to rely on bearer-auth viewer identity rather than any handle-based viewer override.
-- Local automation and local manual-QA databases should be recreated through schema migration plus fixture seeding; they do not need a dedicated sidekick repair command.
+- Local automation uses the disposable `hidden_adventures_test` database and may be recreated through migration plus fixture seeding.
+- Local manual QA uses the persistent `hidden_adventures_nonprod` database and should be migrated forward only; do not reseed it with fixture packs.
+- Future production should use `.env.prod`; the repo-root `.env` file is intentionally blank so accidental fallback fails fast.
 - Legacy archive-derived databases should continue to flow through the existing `migration:*` pipeline, which now publishes sidekick grants directly.
 - No OpenAPI schema or generated client exists yet; the current contract lives in route code, Vitest, and this document.
