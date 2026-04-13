@@ -127,7 +127,7 @@ type TransformSummary = {
   profilesImported: number;
   adventuresImported: number;
   ratingProjectionsImported: number;
-  connectionsImported: number;
+  sidekickGrantsImported: number;
   favoritesImported: number;
   commentsImported: number;
   mediaAssetsImported: number;
@@ -141,7 +141,7 @@ type TransformSummary = {
 
 const visibilityMap = new Map<string, string>([
   ["Private", "private"],
-  ["Sidekicks", "connections"],
+  ["Sidekicks", "sidekicks"],
   ["Public", "public"]
 ]);
 
@@ -252,7 +252,7 @@ async function clearWorkRows(client: PoolClient, runId: number) {
   const statements = [
     "delete from migration_work.adventure_comments_work where run_id = $1",
     "delete from migration_work.adventure_favorites_work where run_id = $1",
-    "delete from migration_work.connections_work where run_id = $1",
+    "delete from migration_work.sidekick_grants_work where run_id = $1",
     "delete from migration_work.adventure_rating_projection_work where run_id = $1",
     "delete from migration_work.adventures_work where run_id = $1",
     "delete from migration_work.media_assets_work where run_id = $1",
@@ -706,14 +706,14 @@ async function importAdventures(
   return adventuresByLegacyId;
 }
 
-async function importConnections(
+async function importSidekickGrants(
   client: PoolClient,
   runId: number,
   rows: RawRow<SidekickRaw>[],
   usersByHandle: Map<string, ProfileWorkSeed>,
   summary: TransformSummary
 ) {
-  const candidatesByPair = new Map<string, ConnectionCandidate[]>();
+  const candidatesByGrant = new Map<string, ConnectionCandidate[]>();
 
   for (const row of rows) {
     const sidekick = row.payload_json;
@@ -767,8 +767,8 @@ async function importConnections(
 
     const createdAt = coerceTimestamp(sidekick.createdAt, new Date(initiator.createdAt));
     const updatedAt = coerceTimestamp(sidekick.updatedAt, new Date(createdAt));
-    const pairKey = [initiatorHandle, partnerHandle].sort().join("::");
-    const existing = candidatesByPair.get(pairKey) ?? [];
+    const grantKey = `${initiatorHandle}::${partnerHandle}`;
+    const existing = candidatesByGrant.get(grantKey) ?? [];
     existing.push({
       row,
       initiatorHandle,
@@ -776,10 +776,10 @@ async function importConnections(
       createdAt,
       updatedAt
     });
-    candidatesByPair.set(pairKey, existing);
+    candidatesByGrant.set(grantKey, existing);
   }
 
-  for (const [pairKey, candidates] of candidatesByPair) {
+  for (const [grantKey, candidates] of candidatesByGrant) {
     candidates.sort((left, right) => {
       const createdDelta =
         new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
@@ -792,14 +792,11 @@ async function importConnections(
     });
 
     const first = candidates[0];
-    const lowHandle = [first.initiatorHandle, first.partnerHandle].sort()[0];
-    const highHandle = [first.initiatorHandle, first.partnerHandle].sort()[1];
-    const lowUser = usersByHandle.get(lowHandle);
-    const highUser = usersByHandle.get(highHandle);
     const initiator = usersByHandle.get(first.initiatorHandle);
+    const partner = usersByHandle.get(first.partnerHandle);
 
-    if (!lowUser || !highUser || !initiator) {
-      throw new Error(`Resolved connection pair ${pairKey} lost one of its user mappings.`);
+    if (!initiator || !partner) {
+      throw new Error(`Resolved sidekick grant ${grantKey} lost one of its user mappings.`);
     }
 
     const latestUpdatedAt = candidates
@@ -808,15 +805,12 @@ async function importConnections(
 
     await client.query(
       `
-        insert into migration_work.connections_work (
+        insert into migration_work.sidekick_grants_work (
           run_id,
-          connection_id,
-          user_id_low,
-          user_id_high,
-          initiated_by_user_id,
-          status,
-          requested_at,
-          responded_at,
+          sidekick_grant_id,
+          grantor_user_id,
+          grantee_user_id,
+          created_at,
           updated_at,
           source_username,
           source_sidekick_name
@@ -825,30 +819,25 @@ async function importConnections(
           $2::uuid,
           $3::uuid,
           $4::uuid,
-          $5::uuid,
-          'accepted',
+          $5::timestamptz,
           $6::timestamptz,
-          $7::timestamptz,
-          $8::timestamptz,
-          $9,
-          $10
+          $7,
+          $8
         )
       `,
       [
         runId,
-        stableUuid(`legacy_connection:${lowHandle}:${highHandle}`),
-        lowUser.userId,
-        highUser.userId,
+        stableUuid(`legacy_sidekick_grant:${first.initiatorHandle}:${first.partnerHandle}`),
         initiator.userId,
+        partner.userId,
         first.createdAt,
-        latestUpdatedAt,
         latestUpdatedAt,
         first.initiatorHandle,
         first.partnerHandle
       ]
     );
 
-    summary.connectionsImported += 1;
+    summary.sidekickGrantsImported += 1;
 
     for (const duplicate of candidates.slice(1)) {
       summary.skippedSidekicks += 1;
@@ -1088,7 +1077,7 @@ async function run() {
       profilesImported: 0,
       adventuresImported: 0,
       ratingProjectionsImported: 0,
-      connectionsImported: 0,
+      sidekickGrantsImported: 0,
       favoritesImported: 0,
       commentsImported: 0,
       mediaAssetsImported: 0,
@@ -1118,7 +1107,7 @@ async function run() {
       mediaByStorageKey,
       transformSummary
     );
-    await importConnections(
+    await importSidekickGrants(
       client,
       options.runId,
       sidekickRows,

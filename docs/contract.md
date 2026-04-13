@@ -201,6 +201,63 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `409` with `{ error: "Handle unavailable." }` when the chosen handle already exists
   - `200` with the same bootstrap-style payload shape as `GET /api/auth/bootstrap`
 
+### `GET /api/me/sidekicks`
+
+- auth: required
+- query:
+  - `limit`: integer, min `1`, max `50`, default `20`
+  - `offset`: integer, min `0`, default `0`
+- any extra query param is rejected with `400`
+- response:
+  - `200` with `{ items, paging }`
+- returns only outbound sidekick grants from the authenticated viewer
+
+### `GET /api/sidekicks/discover`
+
+- auth: required
+- query:
+  - `limit`: integer, min `1`, max `50`, default `20`
+  - `offset`: integer, min `0`, default `0`
+- any extra query param is rejected with `400`
+- response:
+  - `200` with `{ items, paging }`
+- ordered by signup date descending and excludes the authenticated viewer
+
+### `GET /api/sidekicks/search`
+
+- auth: required
+- query:
+  - `q`: non-empty trimmed string
+  - `limit`: integer, min `1`, max `50`, default `20`
+  - `offset`: integer, min `0`, default `0`
+- any extra query param is rejected with `400`
+- response:
+  - `200` with `{ items, paging, query }`
+- matches `handle`, `displayName`, `homeCity`, and `homeRegion`
+- excludes the authenticated viewer
+
+### `POST /api/me/sidekicks/:handle`
+
+- auth: required
+- params:
+  - `handle`: non-empty string up to `64` chars
+- response:
+  - `200` with `{ item }`
+  - `400` when the viewer targets their own handle
+  - `404` with `{ error: "Profile not found." }`
+- creates or preserves a unilateral sidekick grant from the viewer to the target
+
+### `DELETE /api/me/sidekicks/:handle`
+
+- auth: required
+- params:
+  - `handle`: non-empty string up to `64` chars
+- response:
+  - `200` with `{ item }`
+  - `400` when the viewer targets their own handle
+  - `404` with `{ error: "Profile not found." }`
+- removes the viewer's unilateral sidekick grant to the target when present
+
 ## Auth And Visibility Rules
 
 - `GET /api/health` is public; all other current `/api` routes require bearer auth.
@@ -213,7 +270,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - Read visibility is currently:
   - authenticated viewers can read `public` adventures
   - an authenticated author can read their own published adventures
-  - an authenticated accepted sidekick can read `sidekicks` visibility adventures
+  - a viewer can read `sidekicks` adventures only when the author has granted that viewer sidekick access
   - non-visible or missing adventures collapse to the same `404`
 
 ## Payload Assumptions The iOS Thread May Rely On
@@ -231,15 +288,17 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - `user` in auth payloads may be `null` when `accountState` is `new_user_needs_handle`.
 - `suggestedHandle` may be `null` or a normalized lowercase underscore-separated string.
 - The iOS client should treat `handle` as the public username and `displayName` as optional profile presentation data.
+- Sidekick list/discovery/search rows use `{ profile, relationship, stats }` and reuse the profile media object shape for `profile.avatar`.
 
 ## Intentional Non-Contract Items
 
 - No map-specific endpoint exists yet in this server repo.
 - Feed remains single-image even though detail media is now ordered for future carousel work.
-- No favorites, comments, ratings, or sidekick-management write surface is part of this lock.
 - Postman request definitions are for manual smoke checks only and are not formal acceptance.
 
 ## Current Documentation Notes
 
 - The iOS app should continue to rely on bearer-auth viewer identity rather than any handle-based viewer override.
+- Local automation and local manual-QA databases should be recreated through schema migration plus fixture seeding; they do not need a dedicated sidekick repair command.
+- Legacy archive-derived databases should continue to flow through the existing `migration:*` pipeline, which now publishes sidekick grants directly.
 - No OpenAPI schema or generated client exists yet; the current contract lives in route code, Vitest, and this document.

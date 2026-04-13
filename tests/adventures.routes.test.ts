@@ -506,7 +506,7 @@ describe("adventure routes", () => {
     await app.close();
   });
 
-  it("creates a sidekicks adventure using the stored connections visibility", async () => {
+  it("creates a sidekicks adventure using stored sidekicks visibility", async () => {
     listOwnedMediaAssetsForAdventureCreateMock.mockResolvedValue([
       {
         id: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
@@ -545,7 +545,7 @@ describe("adventure routes", () => {
     expect(response.statusCode).toBe(201);
     expect(createAdventureMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        visibility: "connections"
+        visibility: "sidekicks"
       }),
       expect.anything()
     );

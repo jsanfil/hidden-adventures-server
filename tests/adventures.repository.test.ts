@@ -100,7 +100,7 @@ describe("adventures repository", () => {
     expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("where handle = $1");
   });
 
-  it("maps stored connections visibility into sidekicks for API cards", async () => {
+  it("returns stored sidekicks visibility for API cards", async () => {
     dbMock.query.mockResolvedValue({
       rows: [
         {
@@ -108,7 +108,7 @@ describe("adventures repository", () => {
           title: "Quiet Ridge",
           description: null,
           category_slug: "viewpoints",
-          visibility: "connections",
+          visibility: "sidekicks",
           created_at: "2026-03-01T00:00:00.000Z",
           published_at: null,
           latitude: null,

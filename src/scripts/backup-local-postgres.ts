@@ -116,6 +116,7 @@ function isDirectExecution(): boolean {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  console.log(`Backing up Postgres database: ${env.POSTGRES_DB}`);
   const outputPath = await createLocalPostgresBackup(options);
   console.log(outputPath);
 }
