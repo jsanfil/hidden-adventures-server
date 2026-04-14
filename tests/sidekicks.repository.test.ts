@@ -69,6 +69,7 @@ describe("sidekicks repository", () => {
         }
       }
     ]);
+    expect(dbMock.query.mock.calls[0]?.[0]).toContain("order by max(granted.created_at) desc");
   });
 
   it("discovers profiles and annotates existing sidekick state", async () => {

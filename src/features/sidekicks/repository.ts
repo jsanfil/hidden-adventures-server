@@ -139,7 +139,7 @@ export async function listMySidekicks(options: {
        and granted.grantor_user_id = $1::uuid
       where users.id <> $1::uuid
       ${summaryGroupBy}
-      order by granted.created_at desc, users.id desc
+      order by max(granted.created_at) desc, users.id desc
       limit $2
       offset $3
     `,

@@ -32,6 +32,7 @@ This repo uses three explicit environments.
 - auth mode: `test_jwt`
 - data model: disposable and fully scripted
 - use this for regression testing, fixture seeding, and automated local development
+- default local server mode for automated verification work in this repo
 
 ### 2. Manual QA
 
@@ -76,6 +77,12 @@ docker compose up --build -d
 
 ### Automation Testing Setup
 
+Automation rule:
+
+- when doing automated local development, scripted verification, or route-level debugging, run the server in automation mode with `npm run dev:automation`
+- when invoking Vitest directly, load `.env.local.automation` explicitly or use the repo scripts below that already do it for database and regression workflows
+- do not use manual-QA mode for disposable automation work
+
 Create the automation database:
 
 ```sh
@@ -99,6 +106,12 @@ Run the test suite:
 
 ```sh
 npm test
+```
+
+If you need to run a focused Vitest command outside the canned regression scripts, inject the automation env file explicitly:
+
+```sh
+node --env-file=.env.local.automation ./node_modules/vitest/vitest.mjs run
 ```
 
 Run the full disposable regression loop:
