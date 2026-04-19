@@ -9,8 +9,8 @@ import { db } from "../db/client.js";
 import {
   fixtureAdventureId,
   fixtureCommentId,
-  fixtureConnectionId,
   fixtureMediaAssetId,
+  fixtureSidekickGrantId,
   fixtureUserId,
   loadFixturePack,
   type FixturePack
@@ -96,7 +96,7 @@ async function clearPublicTables(client: PoolClient) {
     "delete from public.adventure_favorites",
     "delete from public.adventure_media",
     "delete from public.adventures",
-    "delete from public.connections",
+    "delete from public.sidekick_grants",
     "delete from public.profiles",
     "delete from public.media_assets",
     "delete from public.users"
@@ -231,46 +231,30 @@ async function seedProfiles(client: PoolClient, pack: FixturePack) {
   }
 }
 
-function orderedPair(userIdA: string, userIdB: string) {
-  return userIdA < userIdB
-    ? { low: userIdA, high: userIdB }
-    : { low: userIdB, high: userIdA };
-}
-
-async function seedConnections(client: PoolClient, pack: FixturePack) {
-  for (const connection of pack.connections) {
-    const pair = orderedPair(fixtureUserId(pack, connection.userKeyA), fixtureUserId(pack, connection.userKeyB));
+async function seedSidekicks(client: PoolClient, pack: FixturePack) {
+  for (const sidekick of pack.sidekicks) {
     await client.query(
       `
-        insert into public.connections (
+        insert into public.sidekick_grants (
           id,
-          user_id_low,
-          user_id_high,
-          initiated_by_user_id,
-          status,
-          requested_at,
-          responded_at,
+          grantor_user_id,
+          grantee_user_id,
+          created_at,
           updated_at
         ) values (
           $1::uuid,
           $2::uuid,
           $3::uuid,
-          $4::uuid,
-          $5::public.connection_status,
-          $6::timestamptz,
-          $7::timestamptz,
-          $8::timestamptz
+          $4::timestamptz,
+          $5::timestamptz
         )
       `,
       [
-        fixtureConnectionId(pack, connection.key),
-        pair.low,
-        pair.high,
-        fixtureUserId(pack, connection.initiatedByPersonaKey),
-        connection.status,
-        connection.requestedAt,
-        connection.respondedAt,
-        connection.updatedAt
+        fixtureSidekickGrantId(pack, sidekick.key),
+        fixtureUserId(pack, sidekick.grantorPersonaKey),
+        fixtureUserId(pack, sidekick.granteePersonaKey),
+        sidekick.createdAt,
+        sidekick.updatedAt
       ]
     );
   }
@@ -495,7 +479,7 @@ async function main() {
     await seedUsers(client, pack, subjects);
     await seedMediaAssets(client, pack);
     await seedProfiles(client, pack);
-    await seedConnections(client, pack);
+    await seedSidekicks(client, pack);
     await seedAdventures(client, pack);
     await seedFavorites(client, pack);
     await seedRatings(client, pack);

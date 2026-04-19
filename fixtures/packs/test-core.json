@@ -112,15 +112,12 @@
       "updatedAt": "2026-03-06T00:00:00.000Z"
     }
   ],
-  "connections": [
+  "sidekicks": [
     {
       "key": "author-connected-viewer",
-      "userKeyA": "fixture_author",
-      "userKeyB": "connected_viewer",
-      "initiatedByPersonaKey": "connected_viewer",
-      "status": "accepted",
-      "requestedAt": "2026-03-04T00:00:00.000Z",
-      "respondedAt": "2026-03-04T01:00:00.000Z",
+      "grantorPersonaKey": "connected_viewer",
+      "granteePersonaKey": "fixture_author",
+      "createdAt": "2026-03-04T00:00:00.000Z",
       "updatedAt": "2026-03-04T01:00:00.000Z"
     }
   ],
@@ -147,7 +144,7 @@
       "title": "Connected Canyon",
       "description": "Only accepted connections should see this seeded adventure during automated regression.",
       "categorySlug": "viewpoints",
-      "visibility": "connections",
+      "visibility": "sidekicks",
       "status": "published",
       "longitude": -118.4411,
       "latitude": 34.131,

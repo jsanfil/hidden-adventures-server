@@ -166,17 +166,13 @@ function profileAdventureVisibilityClause(): string {
         where viewer.id = adventures.author_user_id
       )
       or (
-        adventures.visibility = 'connections'
+        adventures.visibility = 'sidekicks'
         and exists (
           select 1
           from viewer
-          join public.connections
-            on public.connections.status = 'accepted'
-           and (
-             (public.connections.user_id_low = viewer.id and public.connections.user_id_high = adventures.author_user_id)
-             or
-             (public.connections.user_id_high = viewer.id and public.connections.user_id_low = adventures.author_user_id)
-           )
+          join public.sidekick_grants
+            on public.sidekick_grants.grantor_user_id = adventures.author_user_id
+           and public.sidekick_grants.grantee_user_id = viewer.id
         )
       )
     )

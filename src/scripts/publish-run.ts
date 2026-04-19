@@ -91,7 +91,7 @@ async function clearPublicTables(client: PoolClient) {
     "delete from public.adventure_favorites",
     "delete from public.adventure_media",
     "delete from public.adventures",
-    "delete from public.connections",
+    "delete from public.sidekick_grants",
     "delete from public.profiles",
     "delete from public.media_assets",
     "delete from public.users"
@@ -197,29 +197,23 @@ async function publishProfiles(client: PoolClient, runId: number) {
   );
 }
 
-async function publishConnections(client: PoolClient, runId: number) {
+async function publishSidekickGrants(client: PoolClient, runId: number) {
   await client.query(
     `
-      insert into public.connections (
+      insert into public.sidekick_grants (
         id,
-        user_id_low,
-        user_id_high,
-        initiated_by_user_id,
-        status,
-        requested_at,
-        responded_at,
+        grantor_user_id,
+        grantee_user_id,
+        created_at,
         updated_at
       )
       select
-        connection_id,
-        least(user_id_low, user_id_high),
-        greatest(user_id_low, user_id_high),
-        initiated_by_user_id,
-        status::public.connection_status,
-        requested_at,
-        responded_at,
+        sidekick_grant_id,
+        grantor_user_id,
+        grantee_user_id,
+        created_at,
         updated_at
-      from migration_work.connections_work
+      from migration_work.sidekick_grants_work
       where run_id = $1
     `,
     [runId]
@@ -406,7 +400,7 @@ async function buildReport(client: PoolClient, runId: number): Promise<PublishRe
     users: await getCount(client, "select count(*)::text as count from migration_work.users_work where run_id = $1", [runId]),
     profiles: await getCount(client, "select count(*)::text as count from migration_work.profiles_work where run_id = $1", [runId]),
     adventures: await getCount(client, "select count(*)::text as count from migration_work.adventures_work where run_id = $1", [runId]),
-    connections: await getCount(client, "select count(*)::text as count from migration_work.connections_work where run_id = $1", [runId]),
+    sidekicks: await getCount(client, "select count(*)::text as count from migration_work.sidekick_grants_work where run_id = $1", [runId]),
     favorites: await getCount(client, "select count(*)::text as count from migration_work.adventure_favorites_work where run_id = $1", [runId]),
     comments: await getCount(client, "select count(*)::text as count from migration_work.adventure_comments_work where run_id = $1", [runId]),
     mediaAssets: await getCount(client, "select count(*)::text as count from migration_work.media_assets_work where run_id = $1", [runId]),
@@ -417,7 +411,7 @@ async function buildReport(client: PoolClient, runId: number): Promise<PublishRe
     users: await getCount(client, "select count(*)::text as count from public.users"),
     profiles: await getCount(client, "select count(*)::text as count from public.profiles"),
     adventures: await getCount(client, "select count(*)::text as count from public.adventures"),
-    connections: await getCount(client, "select count(*)::text as count from public.connections"),
+    sidekicks: await getCount(client, "select count(*)::text as count from public.sidekick_grants"),
     favorites: await getCount(client, "select count(*)::text as count from public.adventure_favorites"),
     comments: await getCount(client, "select count(*)::text as count from public.adventure_comments"),
     mediaAssets: await getCount(client, "select count(*)::text as count from public.media_assets"),
@@ -444,7 +438,7 @@ async function buildReport(client: PoolClient, runId: number): Promise<PublishRe
     { name: "users published matches work", expected: workCounts.users, actual: publicCounts.users },
     { name: "profiles published matches work", expected: workCounts.profiles, actual: publicCounts.profiles },
     { name: "adventures published matches work", expected: workCounts.adventures, actual: publicCounts.adventures },
-    { name: "connections published matches work", expected: workCounts.connections, actual: publicCounts.connections },
+    { name: "sidekicks published matches work", expected: workCounts.sidekicks, actual: publicCounts.sidekicks },
     { name: "favorites published matches work", expected: workCounts.favorites, actual: publicCounts.favorites },
     { name: "comments published matches work", expected: workCounts.comments, actual: publicCounts.comments },
     { name: "media assets published matches work", expected: workCounts.mediaAssets, actual: publicCounts.mediaAssets },
@@ -478,7 +472,7 @@ async function run() {
     await publishUsers(client, options.runId);
     await publishMediaAssets(client, options.runId);
     await publishProfiles(client, options.runId);
-    await publishConnections(client, options.runId);
+    await publishSidekickGrants(client, options.runId);
     await publishAdventures(client, options.runId);
     await publishAdventureMedia(client, options.runId);
     await publishFavorites(client, options.runId);

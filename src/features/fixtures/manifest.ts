@@ -47,14 +47,11 @@ const MediaAssetSchema = z.object({
   updatedAt: TimestampSchema
 });
 
-const ConnectionSchema = z.object({
+const SidekickSchema = z.object({
   key: z.string().min(1),
-  userKeyA: z.string().min(1),
-  userKeyB: z.string().min(1),
-  initiatedByPersonaKey: z.string().min(1),
-  status: z.enum(["accepted"]),
-  requestedAt: TimestampSchema,
-  respondedAt: TimestampSchema,
+  grantorPersonaKey: z.string().min(1),
+  granteePersonaKey: z.string().min(1),
+  createdAt: TimestampSchema,
   updatedAt: TimestampSchema
 });
 
@@ -64,7 +61,7 @@ const AdventureSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   categorySlug: z.enum(canonicalCategorySlugs),
-  visibility: z.enum(["public", "connections", "private"]),
+  visibility: z.enum(["public", "sidekicks", "private"]),
   status: z.enum(["published", "draft", "archived", "pending_moderation"]).default("published"),
   longitude: z.number().optional(),
   latitude: z.number().optional(),
@@ -104,7 +101,7 @@ const FixturePackSchema = z.object({
   targetDatabase: z.string().min(1),
   personas: z.array(PersonaSchema).min(1),
   mediaAssets: z.array(MediaAssetSchema),
-  connections: z.array(ConnectionSchema),
+  sidekicks: z.array(SidekickSchema),
   adventures: z.array(AdventureSchema),
   favorites: z.array(FavoriteSchema),
   ratings: z.array(RatingSchema),
@@ -139,7 +136,7 @@ function ensureReference<T extends string>(value: T, set: Set<string>, label: st
 function validateRelationships(pack: FixturePack) {
   ensureUnique(pack.personas, "persona");
   ensureUnique(pack.mediaAssets, "media asset");
-  ensureUnique(pack.connections, "connection");
+  ensureUnique(pack.sidekicks, "sidekick");
   ensureUnique(pack.adventures, "adventure");
   ensureUnique(pack.comments, "comment");
 
@@ -168,10 +165,9 @@ function validateRelationships(pack: FixturePack) {
     ensureReference(asset.ownerPersonaKey, personaUserKeys, "media owner persona");
   }
 
-  for (const connection of pack.connections) {
-    ensureReference(connection.userKeyA, personaUserKeys, "connection persona");
-    ensureReference(connection.userKeyB, personaUserKeys, "connection persona");
-    ensureReference(connection.initiatedByPersonaKey, personaUserKeys, "connection initiator");
+  for (const sidekick of pack.sidekicks) {
+    ensureReference(sidekick.grantorPersonaKey, personaUserKeys, "sidekick grantor");
+    ensureReference(sidekick.granteePersonaKey, personaUserKeys, "sidekick grantee");
   }
 
   for (const adventure of pack.adventures) {
@@ -213,8 +209,8 @@ export function fixtureMediaAssetId(pack: FixturePack, mediaKey: string): string
   return stableUuid(`fixture:${pack.pack}:media:${mediaKey}`);
 }
 
-export function fixtureConnectionId(pack: FixturePack, connectionKey: string): string {
-  return stableUuid(`fixture:${pack.pack}:connection:${connectionKey}`);
+export function fixtureSidekickGrantId(pack: FixturePack, sidekickKey: string): string {
+  return stableUuid(`fixture:${pack.pack}:sidekick:${sidekickKey}`);
 }
 
 export function fixtureAdventureId(pack: FixturePack, adventureKey: string): string {
@@ -231,7 +227,7 @@ export function fixturePackSummary(pack: FixturePack) {
     linkedUsers: pack.personas.filter((persona) => persona.user).length,
     adventures: pack.adventures.length,
     mediaAssets: pack.mediaAssets.length,
-    connections: pack.connections.length,
+    sidekicks: pack.sidekicks.length,
     favorites: pack.favorites.length,
     ratings: pack.ratings.length,
     comments: pack.comments.length

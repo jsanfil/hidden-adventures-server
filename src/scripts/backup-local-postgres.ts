@@ -37,7 +37,8 @@ export function resolveLocalBackupDir(
 
 export function buildBackupFilePath(backupDir: string, date = new Date()): string {
   const timestamp = date.toISOString().replace(/[:.]/g, "-");
-  return path.join(backupDir, `hidden-adventures-local-${timestamp}.dump`);
+  const databaseName = env.POSTGRES_DB || "unknown-database";
+  return path.join(backupDir, `hidden-adventures-${databaseName}-${timestamp}.dump`);
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -116,6 +117,7 @@ function isDirectExecution(): boolean {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  console.log(`Backing up Postgres database: ${env.POSTGRES_DB}`);
   const outputPath = await createLocalPostgresBackup(options);
   console.log(outputPath);
 }

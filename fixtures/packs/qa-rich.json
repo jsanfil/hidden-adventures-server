@@ -175,25 +175,19 @@
       "updatedAt": "2026-03-07T00:00:00.000Z"
     }
   ],
-  "connections": [
+  "sidekicks": [
     {
       "key": "maya-owen",
-      "userKeyA": "maya_trails",
-      "userKeyB": "owen_peak",
-      "initiatedByPersonaKey": "owen_peak",
-      "status": "accepted",
-      "requestedAt": "2026-03-02T10:00:00.000Z",
-      "respondedAt": "2026-03-02T12:00:00.000Z",
+      "grantorPersonaKey": "owen_peak",
+      "granteePersonaKey": "maya_trails",
+      "createdAt": "2026-03-02T10:00:00.000Z",
       "updatedAt": "2026-03-02T12:00:00.000Z"
     },
     {
       "key": "maya-ivy",
-      "userKeyA": "maya_trails",
-      "userKeyB": "ivy_coast",
-      "initiatedByPersonaKey": "maya_trails",
-      "status": "accepted",
-      "requestedAt": "2026-03-03T10:00:00.000Z",
-      "respondedAt": "2026-03-03T12:00:00.000Z",
+      "grantorPersonaKey": "maya_trails",
+      "granteePersonaKey": "ivy_coast",
+      "createdAt": "2026-03-03T10:00:00.000Z",
       "updatedAt": "2026-03-03T12:00:00.000Z"
     }
   ],
@@ -252,7 +246,7 @@
       "title": "Foggy Pines Traverse",
       "description": "This is the sort of entry only accepted connections should see. Good for visibility QA and map-card parity later.",
       "categorySlug": "nature_escapes",
-      "visibility": "connections",
+      "visibility": "sidekicks",
       "status": "published",
       "longitude": -118.233,
       "latitude": 34.219,

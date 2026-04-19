@@ -253,7 +253,7 @@ describe("profiles repository", () => {
     ]);
   });
 
-  it("maps stored connections visibility into sidekicks for profile adventure payloads", async () => {
+  it("returns stored sidekicks visibility for profile adventure payloads", async () => {
     dbMock.query
       .mockResolvedValueOnce({
         rows: [
@@ -280,7 +280,7 @@ describe("profiles repository", () => {
             title: "Quiet Ridge",
             description: "Best at sunset.",
             category_slug: "viewpoints",
-            visibility: "connections",
+            visibility: "sidekicks",
             created_at: "2026-03-01T00:00:00.000Z",
             published_at: "2026-03-02T00:00:00.000Z",
             latitude: 34.12,

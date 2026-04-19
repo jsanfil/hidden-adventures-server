@@ -21,7 +21,7 @@ type SeedSummary = {
   managedHandles: string[];
   managedSubjects: string[];
   publicAdventureId: string;
-  connectionsAdventureId: string;
+  sidekicksAdventureId: string;
   profileHandle: string;
 };
 
@@ -49,12 +49,6 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   return { backupDir };
-}
-
-function orderedConnectionPair(userIdA: string, userIdB: string) {
-  return userIdA < userIdB
-    ? { userIdLow: userIdA, userIdHigh: userIdB }
-    : { userIdLow: userIdB, userIdHigh: userIdA };
 }
 
 async function deleteManagedFixtures(client: PoolClient) {
@@ -145,38 +139,28 @@ async function insertManagedUsers(client: PoolClient) {
   }
 }
 
-async function insertConnections(client: PoolClient) {
-  const pair = orderedConnectionPair(fixtureAuthor.id, connectedViewer.id);
-
+async function insertSidekicks(client: PoolClient) {
   await client.query(
     `
-      insert into public.connections (
+      insert into public.sidekick_grants (
         id,
-        user_id_low,
-        user_id_high,
-        initiated_by_user_id,
-        status,
-        requested_at,
-        responded_at,
+        grantor_user_id,
+        grantee_user_id,
+        created_at,
         updated_at
       ) values (
         $1::uuid,
         $2::uuid,
         $3::uuid,
-        $4::uuid,
-        'accepted',
-        $5::timestamptz,
-        $6::timestamptz,
-        $7::timestamptz
+        $4::timestamptz,
+        $5::timestamptz
       )
     `,
     [
-      makeLocalFixtureId("connection:author-connected-viewer"),
-      pair.userIdLow,
-      pair.userIdHigh,
+      makeLocalFixtureId("sidekick:connected-viewer-to-author"),
       connectedViewer.id,
+      fixtureAuthor.id,
       "2026-03-04T00:00:00.000Z",
-      "2026-03-04T01:00:00.000Z",
       "2026-03-04T01:00:00.000Z"
     ]
   );
@@ -252,7 +236,7 @@ async function insertAdventures(client: PoolClient) {
         $3,
         $4,
         $5,
-        'connections',
+        'sidekicks',
         'published',
         ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography,
         $8,
@@ -266,7 +250,7 @@ async function insertAdventures(client: PoolClient) {
       localFixtureContent.connectionsAdventureId,
       fixtureAuthor.id,
       "Connected Canyon",
-      "Only accepted connections should see this seeded adventure.",
+      "Only granted sidekicks should see this seeded adventure.",
       "viewpoints",
       -118.4411,
       34.131,
@@ -318,14 +302,14 @@ async function insertEngagement(client: PoolClient) {
     `,
     [
       makeLocalFixtureId("comment:public-connected-viewer"),
-      makeLocalFixtureId("comment:connections-author"),
+      makeLocalFixtureId("comment:sidekicks-author"),
       localFixtureContent.publicAdventureId,
       connectedViewer.id,
       "Saving this for a weekend revisit.",
       "2026-03-07T02:00:00.000Z",
       localFixtureContent.connectionsAdventureId,
       fixtureAuthor.id,
-      "Connections can meet here just before sunset.",
+      "Sidekicks can meet here just before sunset.",
       "2026-03-08T02:00:00.000Z"
     ]
   );
@@ -358,7 +342,7 @@ export async function seedLocalFixtures(options: CliOptions = {}): Promise<SeedS
   await db.withTransaction(async (client) => {
     await deleteManagedFixtures(client);
     await insertManagedUsers(client);
-    await insertConnections(client);
+    await insertSidekicks(client);
     await insertAdventures(client);
     await insertEngagement(client);
   });
@@ -368,7 +352,7 @@ export async function seedLocalFixtures(options: CliOptions = {}): Promise<SeedS
     managedHandles: listSeededLocalHandles(),
     managedSubjects: listSeededLocalSubjects(),
     publicAdventureId: localFixtureContent.publicAdventureId,
-    connectionsAdventureId: localFixtureContent.connectionsAdventureId,
+    sidekicksAdventureId: localFixtureContent.connectionsAdventureId,
     profileHandle: localFixtureContent.profileHandle
   };
 }
