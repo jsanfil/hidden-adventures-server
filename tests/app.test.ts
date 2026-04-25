@@ -324,6 +324,231 @@ describe("buildApp", () => {
     await app.close();
   });
 
+  it("returns discover home modules through the registered app routes", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "user-2",
+            handle: "mayaexplores",
+            display_name: "Maya Reyes",
+            home_city: "Portland",
+            home_region: "OR",
+            avatar_media_id: "avatar-1",
+            avatar_storage_key: "profiles/maya.jpg",
+            preview_media_id: "media-10",
+            preview_media_storage_key: "adventures/maya-preview.jpg",
+            public_adventure_count: "62",
+            top_category_slugs: ["water_spots", "caves"]
+          }
+        ]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({
+          id: "discover-adventure-1",
+          title: "Eagle Creek Trail to Tunnel Falls",
+          author_handle: "mayaexplores",
+          author_display_name: "Maya Reyes",
+          author_home_city: "Portland",
+          author_home_region: "OR",
+          favorite_count: 3104,
+          comment_count: 118,
+          rating_count: 847,
+          average_rating: 4.9,
+          place_label: "Columbia River Gorge, OR"
+        })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/discover/home",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      modules: [
+        {
+          id: "explore-adventurers",
+          type: "adventurers",
+          title: "Explore Adventurers",
+          items: [
+            {
+              id: "user-2",
+              handle: "mayaexplores",
+              displayName: "Maya Reyes",
+              homeCity: "Portland",
+              homeRegion: "OR",
+              avatar: {
+                id: "avatar-1",
+                storageKey: "profiles/maya.jpg"
+              },
+              previewMedia: {
+                id: "media-10",
+                storageKey: "adventures/maya-preview.jpg"
+              },
+              publicAdventureCount: 62,
+              topCategorySlugs: ["water_spots", "caves"]
+            }
+          ]
+        },
+        {
+          id: "popular-adventures",
+          type: "adventures",
+          title: "Popular Adventures",
+          items: [
+            {
+              id: "discover-adventure-1",
+              title: "Eagle Creek Trail to Tunnel Falls",
+              description: "Bring water and wear good shoes.",
+              categorySlug: "water_spots",
+              visibility: "public",
+              createdAt: "2026-03-01T00:00:00.000Z",
+              publishedAt: "2026-03-02T00:00:00.000Z",
+              location: {
+                latitude: 34.12,
+                longitude: -118.45
+              },
+              placeLabel: "Columbia River Gorge, OR",
+              author: {
+                handle: "mayaexplores",
+                displayName: "Maya Reyes",
+                homeCity: "Portland",
+                homeRegion: "OR"
+              },
+              primaryMedia: {
+                id: "media-1",
+                storageKey: "adventures/media-1.jpg"
+              },
+              stats: {
+                favoriteCount: 3104,
+                commentCount: 118,
+                ratingCount: 847,
+                averageRating: 4.9
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    await app.close();
+  });
+
+  it("returns grouped discover search results through the registered app routes", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "user-2",
+            handle: "mayaexplores",
+            display_name: "Maya Reyes",
+            home_city: "Portland",
+            home_region: "OR",
+            avatar_media_id: null,
+            avatar_storage_key: null,
+            preview_media_id: null,
+            preview_media_storage_key: null,
+            public_adventure_count: "62",
+            top_category_slugs: ["water_spots", "caves"]
+          }
+        ]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({
+          id: "discover-adventure-1",
+          title: "Eagle Creek Trail to Tunnel Falls",
+          author_handle: "mayaexplores",
+          author_display_name: "Maya Reyes",
+          author_home_city: "Portland",
+          author_home_region: "OR",
+          place_label: "Columbia River Gorge, OR"
+        })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/discover/search?q=Maya&limit=5&offset=10",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      query: "Maya",
+      people: {
+        items: [
+          {
+            id: "user-2",
+            handle: "mayaexplores",
+            displayName: "Maya Reyes",
+            homeCity: "Portland",
+            homeRegion: "OR",
+            avatar: null,
+            previewMedia: null,
+            publicAdventureCount: 62,
+            topCategorySlugs: ["water_spots", "caves"]
+          }
+        ],
+        paging: {
+          limit: 5,
+          offset: 10,
+          returned: 1
+        }
+      },
+      adventures: {
+        items: [
+          {
+            id: "discover-adventure-1",
+            title: "Eagle Creek Trail to Tunnel Falls",
+            description: "Bring water and wear good shoes.",
+            categorySlug: "water_spots",
+            visibility: "public",
+            createdAt: "2026-03-01T00:00:00.000Z",
+            publishedAt: "2026-03-02T00:00:00.000Z",
+            location: {
+              latitude: 34.12,
+              longitude: -118.45
+            },
+            placeLabel: "Columbia River Gorge, OR",
+            author: {
+              handle: "mayaexplores",
+              displayName: "Maya Reyes",
+              homeCity: "Portland",
+              homeRegion: "OR"
+            },
+            primaryMedia: {
+              id: "media-1",
+              storageKey: "adventures/media-1.jpg"
+            },
+            stats: {
+              favoriteCount: 8,
+              commentCount: 3,
+              ratingCount: 2,
+              averageRating: 4.5
+            }
+          }
+        ],
+        paging: {
+          limit: 5,
+          offset: 10,
+          returned: 1
+        }
+      }
+    });
+
+    await app.close();
+  });
+
   it("defaults geo-scoped feed results to recent ordering when sort is omitted", async () => {
     dbMock.query
       .mockResolvedValueOnce({

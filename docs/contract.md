@@ -68,6 +68,97 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `stats.averageRating`
   - `distanceMiles` when geo filtering is active
 
+### `GET /api/discover/home`
+
+- auth: required
+- any query param is rejected with `400`
+- response:
+  - `200` with `{ modules }`
+- returns the full canonical Discover home module set in server-owned order
+- stable top-level fields:
+  - `modules`
+- stable `modules[]` fields:
+  - `id`
+  - `type`
+  - `title`
+  - `items`
+- currently implemented module ids and types:
+  - `explore-adventurers` with `type=adventurers`
+  - `popular-adventures` with `type=adventures`
+- stable Discover adventurer fields:
+  - `id`
+  - `handle`
+  - `displayName`
+  - `homeCity`
+  - `homeRegion`
+  - `avatar`
+  - `previewMedia`
+  - `publicAdventureCount`
+  - `topCategorySlugs`
+- Discover adventurers include only authors with at least one `public` + `published` adventure
+- `Explore Adventurers` ordering:
+  - public adventure count descending
+  - latest public published adventure descending
+  - stable id tie-break
+- `previewMedia` is the primary media from the adventurer's most recent public published adventure when present
+- `topCategorySlugs` contains the top `1-2` canonical category slugs across the adventurer's public published adventures
+- `Popular Adventures` item shape:
+  - same as `GET /api/feed`
+- `Popular Adventures` ordering:
+  - favorite count descending
+  - comment count descending
+  - average rating descending
+  - publish recency descending
+  - stable id tie-break
+
+### `GET /api/discover/search`
+
+- auth: required
+- query:
+  - `q`: non-empty trimmed string
+  - `limit`: integer, min `1`, max `50`, default `20`
+  - `offset`: integer, min `0`, default `0`
+- any extra query param is rejected with `400`
+- `viewerHandle` is rejected with `400`
+- response:
+  - `200` with `{ query, people, adventures }`
+- stable top-level fields:
+  - `query`
+  - `people.items`
+  - `people.paging.limit`
+  - `people.paging.offset`
+  - `people.paging.returned`
+  - `adventures.items`
+  - `adventures.paging.limit`
+  - `adventures.paging.offset`
+  - `adventures.paging.returned`
+- `people.items` shape:
+  - same as Discover adventurer shape from `GET /api/discover/home`
+- `adventures.items` shape:
+  - same as `GET /api/feed`
+- `People` search matches:
+  - `handle`
+  - `displayName`
+- `People` result ordering:
+  - exact handle match
+  - exact display name match
+  - handle prefix match
+  - display name prefix match
+  - same adventurer ranking used by `Explore Adventurers`
+- `Adventures` search matches:
+  - `title`
+  - `placeLabel`
+- `Adventures` result ordering:
+  - exact title match
+  - exact place label match
+  - title prefix match
+  - place label prefix match
+  - publish recency descending
+  - stable id tie-break
+- Discover search is text search only:
+  - no geography expansion
+  - no description matching in the current implementation
+
 ### `GET /api/adventures/:id`
 
 - auth: required
@@ -289,6 +380,14 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - `suggestedHandle` may be `null` or a normalized lowercase underscore-separated string.
 - The iOS client should treat `handle` as the public username and `displayName` as optional profile presentation data.
 - Sidekick list/discovery/search rows use `{ profile, relationship, stats }` and reuse the profile media object shape for `profile.avatar`.
+- Discover home is a `modules[]` composition response, not a set of fixed top-level arrays.
+- Discover home module `items` are homogeneous per module:
+  - `type=adventurers` uses Discover adventurer summaries
+  - `type=adventures` uses the standard adventure card shape
+- `previewMedia` in Discover adventurer summaries follows the same media object shape as other collection payloads and is not a delivery URL.
+- `topCategorySlugs` values come from the canonical adventure category taxonomy:
+  - `viewpoints`, `trails`, `water_spots`, `food_drink`, `abandoned_places`, `caves`, `nature_escapes`, `roadside_stops`
+- Discover search returns grouped `people` and `adventures` sections in one response, each with its own paging object.
 
 ## Intentional Non-Contract Items
 
