@@ -139,6 +139,22 @@ describe("discover repository", () => {
     expect(dbMock.query.mock.calls[1]?.[0]).toContain("adventure_stats.favorite_count desc");
   });
 
+  it("builds discover home top categories from distinct category counts", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: []
+      })
+      .mockResolvedValueOnce({
+        rows: []
+      });
+
+    await listDiscoverHome();
+
+    expect(dbMock.query.mock.calls[0]?.[0]).toContain("array_agg(top_categories.category_slug order by");
+    expect(dbMock.query.mock.calls[0]?.[0]).toContain("group by category_slug");
+    expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("array_agg(adventures.category_slug order by");
+  });
+
   it("searches grouped people and adventures with independent paging and query echo", async () => {
     dbMock.query
       .mockResolvedValueOnce({
@@ -215,5 +231,25 @@ describe("discover repository", () => {
     expect(dbMock.query.mock.calls[1]?.[1]).toEqual([5, 10, "%Maya%", "Maya", "Maya%"]);
     expect(dbMock.query.mock.calls[0]?.[0]).toContain("users.handle ilike $3");
     expect(dbMock.query.mock.calls[1]?.[0]).toContain("adventures.place_label");
+  });
+
+  it("builds discover search top categories from distinct category counts", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: []
+      })
+      .mockResolvedValueOnce({
+        rows: []
+      });
+
+    await searchDiscover({
+      query: "Maya",
+      limit: 5,
+      offset: 0
+    });
+
+    expect(dbMock.query.mock.calls[0]?.[0]).toContain("array_agg(top_categories.category_slug order by");
+    expect(dbMock.query.mock.calls[0]?.[0]).toContain("group by category_slug");
+    expect(dbMock.query.mock.calls[0]?.[0]).not.toContain("array_agg(adventures.category_slug order by");
   });
 });

@@ -189,6 +189,30 @@ const discoverAdventureSelect = `
     on adventure_stats.adventure_id = adventures.id
 `;
 
+const discoverTopCategoriesLateral = `
+  left join lateral (
+    select
+      array_agg(top_categories.category_slug order by top_categories.category_count desc, top_categories.latest_published_at desc, top_categories.category_slug asc) as top_category_slugs
+    from (
+      select
+        category_slug,
+        count(*) as category_count,
+        max(published_at) as latest_published_at
+      from public.adventures
+      where author_user_id = users.id
+        and status = 'published'
+        and visibility = 'public'
+        and category_slug is not null
+      group by category_slug
+      order by
+        category_count desc,
+        latest_published_at desc,
+        category_slug asc
+      limit 2
+    ) top_categories
+  ) top_categories on true
+`;
+
 export async function listDiscoverHome(): Promise<DiscoverHomeResponse> {
   const adventurersResult = await db.query<DiscoverAdventurerRow>(
     `
@@ -204,19 +228,7 @@ export async function listDiscoverHome(): Promise<DiscoverHomeResponse> {
           preview_media.id::text as preview_media_id,
           preview_media.storage_key as preview_media_storage_key,
           count(adventures.id)::text as public_adventure_count,
-          array_remove(
-            array[
-              (
-                array_agg(adventures.category_slug order by category_counts.category_count desc nulls last, category_counts.latest_published_at desc nulls last, adventures.category_slug asc)
-                filter (where adventures.category_slug is not null)
-              )[1],
-              (
-                array_agg(adventures.category_slug order by category_counts.category_count desc nulls last, category_counts.latest_published_at desc nulls last, adventures.category_slug asc)
-                filter (where adventures.category_slug is not null)
-              )[2]
-            ],
-            null
-          ) as top_category_slugs,
+          coalesce(top_categories.top_category_slugs, '{}'::text[]) as top_category_slugs,
           max(adventures.published_at) as latest_public_published_at
         from public.users users
         join public.adventures adventures
@@ -243,20 +255,7 @@ export async function listDiscoverHome(): Promise<DiscoverHomeResponse> {
           order by recent_adventures.published_at desc nulls last, recent_adventures.id desc
           limit 1
         ) preview_media on true
-        left join (
-          select
-            author_user_id,
-            category_slug,
-            count(*) as category_count,
-            max(published_at) as latest_published_at
-          from public.adventures
-          where status = 'published'
-            and visibility = 'public'
-            and category_slug is not null
-          group by author_user_id, category_slug
-        ) category_counts
-          on category_counts.author_user_id = users.id
-         and category_counts.category_slug = adventures.category_slug
+        ${discoverTopCategoriesLateral}
         group by
           users.id,
           users.handle,
@@ -265,6 +264,7 @@ export async function listDiscoverHome(): Promise<DiscoverHomeResponse> {
           profiles.home_region,
           avatar.id,
           avatar.storage_key,
+          top_categories.top_category_slugs,
           preview_media.id,
           preview_media.storage_key
       )
@@ -344,19 +344,7 @@ export async function searchDiscover(options: {
           preview_media.id::text as preview_media_id,
           preview_media.storage_key as preview_media_storage_key,
           count(adventures.id)::text as public_adventure_count,
-          array_remove(
-            array[
-              (
-                array_agg(adventures.category_slug order by category_counts.category_count desc nulls last, category_counts.latest_published_at desc nulls last, adventures.category_slug asc)
-                filter (where adventures.category_slug is not null)
-              )[1],
-              (
-                array_agg(adventures.category_slug order by category_counts.category_count desc nulls last, category_counts.latest_published_at desc nulls last, adventures.category_slug asc)
-                filter (where adventures.category_slug is not null)
-              )[2]
-            ],
-            null
-          ) as top_category_slugs,
+          coalesce(top_categories.top_category_slugs, '{}'::text[]) as top_category_slugs,
           max(adventures.published_at) as latest_public_published_at
         from public.users users
         join public.adventures adventures
@@ -383,20 +371,7 @@ export async function searchDiscover(options: {
           order by recent_adventures.published_at desc nulls last, recent_adventures.id desc
           limit 1
         ) preview_media on true
-        left join (
-          select
-            author_user_id,
-            category_slug,
-            count(*) as category_count,
-            max(published_at) as latest_published_at
-          from public.adventures
-          where status = 'published'
-            and visibility = 'public'
-            and category_slug is not null
-          group by author_user_id, category_slug
-        ) category_counts
-          on category_counts.author_user_id = users.id
-         and category_counts.category_slug = adventures.category_slug
+        ${discoverTopCategoriesLateral}
         where users.handle ilike $3
           or coalesce(profiles.display_name, '') ilike $3
         group by
@@ -407,6 +382,7 @@ export async function searchDiscover(options: {
           profiles.home_region,
           avatar.id,
           avatar.storage_key,
+          top_categories.top_category_slugs,
           preview_media.id,
           preview_media.storage_key
       )
