@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import type { PoolClient, QueryResultRow } from "pg";
+import type { PoolClient, QueryResult, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
 import { toApiAdventureVisibility } from "./visibility.js";
+
+type Queryable = PoolClient | typeof db;
 
 type AdventureFeedRow = QueryResultRow & {
   id: string;
@@ -27,6 +29,7 @@ type AdventureFeedRow = QueryResultRow & {
   average_rating: number | null;
   place_label: string | null;
   distance_miles: number | null;
+  is_favorited: boolean | null;
 };
 
 export type AdventureCard = {
@@ -58,6 +61,7 @@ export type AdventureCard = {
     ratingCount: number;
     averageRating: number;
   };
+  isFavorited: boolean;
   distanceMiles?: number;
 };
 
@@ -121,6 +125,22 @@ export type CreatedAdventure = {
   status: string;
 };
 
+function getExecutor(client?: PoolClient): Queryable {
+  return client ?? db;
+}
+
+async function runQuery<TResult extends QueryResultRow>(
+  client: PoolClient | undefined,
+  text: string,
+  values: unknown[]
+): Promise<QueryResult<TResult>> {
+  const executor = getExecutor(client) as {
+    query: (sql: string, params: unknown[]) => Promise<QueryResult<TResult>>;
+  };
+
+  return executor.query(text, values);
+}
+
 function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
   const distanceMiles = row.distance_miles;
 
@@ -159,6 +179,7 @@ function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
       ratingCount: row.rating_count ?? 0,
       averageRating: row.average_rating ?? 0
     },
+    isFavorited: row.is_favorited ?? false,
     ...(distanceMiles !== null && distanceMiles !== undefined ? { distanceMiles } : {})
   };
 }
@@ -207,7 +228,14 @@ const adventureBaseSelect = `
     adventure_stats.comment_count,
     adventure_stats.rating_count,
     adventure_stats.average_rating,
-    adventures.place_label
+    adventures.place_label,
+    exists (
+      select 1
+      from viewer
+      join public.adventure_favorites
+        on public.adventure_favorites.user_id = viewer.id
+      where public.adventure_favorites.adventure_id = adventures.id
+    ) as is_favorited
 `;
 
 const feedGeoSelect = `
@@ -232,6 +260,42 @@ const feedJoins = `
   left join public.adventure_stats adventure_stats
     on adventure_stats.adventure_id = adventures.id
 `;
+
+async function getVisibleAdventureById(
+  options: {
+    adventureId: string;
+    viewerId?: string;
+  },
+  client?: PoolClient
+): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
+  const result = await runQuery<AdventureDetailRow>(
+    client,
+    `
+      with viewer as (
+        select $1::uuid as id
+      )
+      ${adventureBaseSelect},
+      adventures.updated_at::text as updated_at
+      ${feedJoins}
+      where adventures.id = $2::uuid
+        and adventures.status = 'published'
+        and ${visibilityClause()}
+      limit 1
+    `,
+    [options.viewerId ?? null, options.adventureId]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    ...mapAdventureCard(row),
+    placeLabel: row.place_label,
+    updatedAt: row.updated_at
+  };
+}
 
 export async function listFeed(options: {
   viewerId?: string;
@@ -308,32 +372,7 @@ export async function getAdventureById(options: {
   adventureId: string;
   viewerId?: string;
 }): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
-  const result = await db.query<AdventureDetailRow>(
-    `
-      with viewer as (
-        select $1::uuid as id
-      )
-      ${adventureBaseSelect},
-      adventures.updated_at::text as updated_at
-      ${feedJoins}
-      where adventures.id = $2::uuid
-        and adventures.status = 'published'
-        and ${visibilityClause()}
-      limit 1
-    `,
-    [options.viewerId ?? null, options.adventureId]
-  );
-
-  const row = result.rows[0];
-  if (!row) {
-    return null;
-  }
-
-  return {
-    ...mapAdventureCard(row),
-    placeLabel: row.place_label,
-    updatedAt: row.updated_at
-  };
+  return getVisibleAdventureById(options);
 }
 
 export async function listAdventureMedia(options: {
@@ -470,4 +509,61 @@ export async function createAdventure(
     id: adventureResult.rows[0]!.id,
     status: adventureResult.rows[0]!.status
   };
+}
+
+export async function insertAdventureFavorite(
+  options: {
+    viewerId: string;
+    adventureId: string;
+  },
+  client?: PoolClient
+): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
+  const visibleAdventure = await getVisibleAdventureById(options, client);
+  if (!visibleAdventure) {
+    return null;
+  }
+
+  await runQuery(
+    client,
+    `
+      insert into public.adventure_favorites (
+        user_id,
+        adventure_id,
+        created_at
+      ) values (
+        $1::uuid,
+        $2::uuid,
+        now()
+      )
+      on conflict (user_id, adventure_id) do nothing
+    `,
+    [options.viewerId, options.adventureId]
+  );
+
+  return getVisibleAdventureById(options, client);
+}
+
+export async function deleteAdventureFavorite(
+  options: {
+    viewerId: string;
+    adventureId: string;
+  },
+  client?: PoolClient
+): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
+  const visibleAdventure = await getVisibleAdventureById(options, client);
+  if (!visibleAdventure) {
+    return null;
+  }
+
+  await runQuery(
+    client,
+    `
+      delete from public.adventure_favorites
+      where user_id = $1::uuid
+        and adventure_id = $2::uuid
+    `,
+    [options.viewerId, options.adventureId]
+  );
+
+  return getVisibleAdventureById(options, client);
 }

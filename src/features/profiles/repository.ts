@@ -31,12 +31,18 @@ type ProfileAdventureRow = QueryResultRow & {
   published_at: string | null;
   latitude: number | null;
   longitude: number | null;
+  author_handle: string;
+  author_display_name: string | null;
+  author_home_city: string | null;
+  author_home_region: string | null;
   primary_media_id: string | null;
   primary_media_storage_key: string | null;
   favorite_count: number | null;
   comment_count: number | null;
   rating_count: number | null;
   average_rating: number | null;
+  place_label: string | null;
+  is_favorited: boolean | null;
 };
 
 export type ProfileDetail = {
@@ -117,7 +123,12 @@ function mapProfile(row: ProfileRow): ProfileDetail {
   };
 }
 
-function mapProfileAdventure(row: ProfileAdventureRow, author: ProfileDetail): AdventureCard {
+function mapProfileAdventure(
+  row: ProfileAdventureRow,
+  options?: {
+    includePlaceLabel?: boolean;
+  }
+): AdventureCard {
   return {
     id: row.id,
     title: row.title,
@@ -133,12 +144,12 @@ function mapProfileAdventure(row: ProfileAdventureRow, author: ProfileDetail): A
             longitude: row.longitude
           }
         : null,
-    placeLabel: null,
+    placeLabel: options?.includePlaceLabel ? row.place_label : null,
     author: {
-      handle: author.handle,
-      displayName: author.displayName,
-      homeCity: author.homeCity,
-      homeRegion: author.homeRegion
+      handle: row.author_handle,
+      displayName: row.author_display_name,
+      homeCity: row.author_home_city,
+      homeRegion: row.author_home_region
     },
     primaryMedia:
       row.primary_media_id && row.primary_media_storage_key
@@ -152,7 +163,8 @@ function mapProfileAdventure(row: ProfileAdventureRow, author: ProfileDetail): A
       commentCount: row.comment_count ?? 0,
       ratingCount: row.rating_count ?? 0,
       averageRating: row.average_rating ?? 0
-    }
+    },
+    isFavorited: row.is_favorited ?? false
   };
 }
 
@@ -327,12 +339,23 @@ export async function listProfileAdventures(options: {
         adventures.published_at::text as published_at,
         st_y(adventures.location::geometry) as latitude,
         st_x(adventures.location::geometry) as longitude,
+        author.handle as author_handle,
+        profile_record.display_name as author_display_name,
+        profile_record.home_city as author_home_city,
+        profile_record.home_region as author_home_region,
         media_assets.id::text as primary_media_id,
         media_assets.storage_key as primary_media_storage_key,
         adventure_stats.favorite_count,
         adventure_stats.comment_count,
         adventure_stats.rating_count,
-        adventure_stats.average_rating
+        adventure_stats.average_rating,
+        adventures.place_label,
+        exists (
+          select 1
+          from public.adventure_favorites
+          where public.adventure_favorites.user_id = $1::uuid
+            and public.adventure_favorites.adventure_id = adventures.id
+        ) as is_favorited
       from public.adventures adventures
       left join public.adventure_media adventure_media
         on adventure_media.adventure_id = adventures.id
@@ -343,6 +366,8 @@ export async function listProfileAdventures(options: {
         on adventure_stats.adventure_id = adventures.id
       join public.users author
         on author.id = adventures.author_user_id
+      left join public.profiles profile_record
+        on profile_record.user_id = author.id
       where author.handle = $2
         and adventures.status = 'published'
         and ${profileAdventureVisibilityClause()}
@@ -353,5 +378,75 @@ export async function listProfileAdventures(options: {
     [options.viewerId ?? null, options.profileHandle, options.limit, options.offset]
   );
 
-  return result.rows.map((row) => mapProfileAdventure(row, profile));
+  return result.rows.map((row) => mapProfileAdventure(row));
+}
+
+export async function listProfileFavorites(options: {
+  profileHandle: string;
+  viewerId: string;
+  limit: number;
+  offset: number;
+}): Promise<AdventureCard[]> {
+  const profile = await getProfileByHandle(options.profileHandle);
+  if (!profile) {
+    return [];
+  }
+
+  const result = await db.query<ProfileAdventureRow>(
+    `
+      with viewer as (
+        select $1::uuid as id
+      )
+      select
+        adventures.id::text as id,
+        adventures.title,
+        adventures.description,
+        adventures.category_slug,
+        adventures.visibility::text as visibility,
+        adventures.created_at::text as created_at,
+        adventures.published_at::text as published_at,
+        st_y(adventures.location::geometry) as latitude,
+        st_x(adventures.location::geometry) as longitude,
+        users.handle as author_handle,
+        profiles.display_name as author_display_name,
+        profiles.home_city as author_home_city,
+        profiles.home_region as author_home_region,
+        media_assets.id::text as primary_media_id,
+        media_assets.storage_key as primary_media_storage_key,
+        adventure_stats.favorite_count,
+        adventure_stats.comment_count,
+        adventure_stats.rating_count,
+        adventure_stats.average_rating,
+        adventures.place_label,
+        exists (
+          select 1
+          from public.adventure_favorites
+          where public.adventure_favorites.user_id = $1::uuid
+            and public.adventure_favorites.adventure_id = adventures.id
+        ) as is_favorited
+      from public.adventure_favorites
+      join public.adventures adventures
+        on adventures.id = public.adventure_favorites.adventure_id
+      join public.users users
+        on users.id = adventures.author_user_id
+      left join public.profiles profiles
+        on profiles.user_id = users.id
+      left join public.adventure_media adventure_media
+        on adventure_media.adventure_id = adventures.id
+       and adventure_media.is_primary = true
+      left join public.media_assets media_assets
+        on media_assets.id = adventure_media.media_asset_id
+      left join public.adventure_stats adventure_stats
+        on adventure_stats.adventure_id = adventures.id
+      where public.adventure_favorites.user_id = $1::uuid
+        and adventures.status = 'published'
+        and ${profileAdventureVisibilityClause()}
+      order by public.adventure_favorites.created_at desc, adventures.id desc
+      limit $2
+      offset $3
+    `,
+    [options.viewerId, options.limit, options.offset]
+  );
+
+  return result.rows.map((row) => mapProfileAdventure(row, { includePlaceLabel: true }));
 }

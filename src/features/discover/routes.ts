@@ -39,7 +39,7 @@ export async function discoverRoutes(app: FastifyInstance): Promise<void> {
       return reply;
     }
 
-    return listDiscoverHome();
+    return listDiscoverHome(viewer.id);
   });
 
   app.get("/discover/search", async (request, reply) => {
@@ -50,6 +50,7 @@ export async function discoverRoutes(app: FastifyInstance): Promise<void> {
 
     const query = searchQuerySchema.parse(request.query);
     const result = await searchDiscover({
+      viewerId: viewer.id,
       query: query.q,
       limit: query.limit,
       offset: query.offset

@@ -14,6 +14,7 @@ import {
   getProfileByHandle,
   getProfileByUserId,
   listProfileAdventures,
+  listProfileFavorites,
   updateMyProfile
 } from "../src/features/profiles/repository.js";
 
@@ -199,12 +200,18 @@ describe("profiles repository", () => {
             published_at: "2026-03-02T00:00:00.000Z",
             latitude: 34.12,
             longitude: -118.45,
+            author_handle: "jacksanfil",
+            author_display_name: "Jack",
+            author_home_city: "Los Angeles",
+            author_home_region: "CA",
             primary_media_id: null,
             primary_media_storage_key: null,
             favorite_count: 1,
             comment_count: 2,
             rating_count: 3,
-            average_rating: 4.67
+            average_rating: 4.67,
+            place_label: "Malibu",
+            is_favorited: true
           }
         ]
       });
@@ -242,7 +249,8 @@ describe("profiles repository", () => {
           commentCount: 2,
           ratingCount: 3,
           averageRating: 4.67
-        }
+        },
+        isFavorited: true
       }
     ]);
     expect(dbMock.query).toHaveBeenNthCalledWith(2, expect.stringContaining("select $1::uuid as id"), [
@@ -285,12 +293,18 @@ describe("profiles repository", () => {
             published_at: "2026-03-02T00:00:00.000Z",
             latitude: 34.12,
             longitude: -118.45,
+            author_handle: "jacksanfil",
+            author_display_name: "Jack",
+            author_home_city: "Los Angeles",
+            author_home_region: "CA",
             primary_media_id: null,
             primary_media_storage_key: null,
             favorite_count: 1,
             comment_count: 2,
             rating_count: 3,
-            average_rating: 4.67
+            average_rating: 4.67,
+            place_label: null,
+            is_favorited: false
           }
         ]
       });
@@ -303,5 +317,78 @@ describe("profiles repository", () => {
     });
 
     expect(result[0]?.visibility).toBe("sidekicks");
+    expect(result[0]?.isFavorited).toBe(false);
+  });
+
+  it("lists a viewer favorites collection in save order", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "user-1",
+            handle: "viewer",
+            display_name: "Viewer",
+            bio: "Explorer",
+            home_city: "Portland",
+            home_region: "OR",
+            avatar_media_id: null,
+            avatar_storage_key: null,
+            cover_media_id: null,
+            cover_storage_key: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-03-01T00:00:00.000Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            title: "Quiet Ridge",
+            description: "Best at sunset.",
+            category_slug: "viewpoints",
+            visibility: "public",
+            created_at: "2026-03-01T00:00:00.000Z",
+            published_at: "2026-03-02T00:00:00.000Z",
+            latitude: 34.12,
+            longitude: -118.45,
+            author_handle: "viewer",
+            author_display_name: "Viewer",
+            author_home_city: "Portland",
+            author_home_region: "OR",
+            primary_media_id: null,
+            primary_media_storage_key: null,
+            favorite_count: 1,
+            comment_count: 2,
+            rating_count: 3,
+            average_rating: 4.67,
+            place_label: "Malibu",
+            is_favorited: true
+          }
+        ]
+      });
+
+    const result = await listProfileFavorites({
+      profileHandle: "viewer",
+      viewerId: "viewer-1",
+      limit: 10,
+      offset: 0
+    });
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: "adventure-1",
+        placeLabel: "Malibu",
+        isFavorited: true
+      })
+    ]);
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("from public.adventure_favorites"),
+      ["viewer-1", 10, 0]
+    );
+    expect(dbMock.query.mock.calls[1]?.[0]).toContain(
+      "order by public.adventure_favorites.created_at desc, adventures.id desc"
+    );
   });
 });

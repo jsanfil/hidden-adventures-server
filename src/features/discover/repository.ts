@@ -40,6 +40,7 @@ type DiscoverAdventureRow = QueryResultRow & {
   rating_count: number | null;
   average_rating: number | null;
   place_label: string | null;
+  is_favorited: boolean | null;
 };
 
 export type DiscoverAdventurer = {
@@ -149,7 +150,8 @@ function mapAdventureCard(row: DiscoverAdventureRow): AdventureCard {
       commentCount: row.comment_count ?? 0,
       ratingCount: row.rating_count ?? 0,
       averageRating: row.average_rating ?? 0
-    }
+    },
+    isFavorited: row.is_favorited ?? false
   };
 }
 
@@ -174,7 +176,14 @@ const discoverAdventureSelect = `
     adventure_stats.comment_count,
     adventure_stats.rating_count,
     adventure_stats.average_rating,
-    adventures.place_label
+    adventures.place_label,
+    exists (
+      select 1
+      from viewer
+      join public.adventure_favorites
+        on public.adventure_favorites.user_id = viewer.id
+      where public.adventure_favorites.adventure_id = adventures.id
+    ) as is_favorited
   from public.adventures adventures
   join public.users users
     on users.id = adventures.author_user_id
@@ -213,7 +222,7 @@ const discoverTopCategoriesLateral = `
   ) top_categories on true
 `;
 
-export async function listDiscoverHome(): Promise<DiscoverHomeResponse> {
+export async function listDiscoverHome(viewerId: string): Promise<DiscoverHomeResponse> {
   const adventurersResult = await db.query<DiscoverAdventurerRow>(
     `
       with ranked_adventurers as (
@@ -291,6 +300,9 @@ export async function listDiscoverHome(): Promise<DiscoverHomeResponse> {
 
   const adventuresResult = await db.query<DiscoverAdventureRow>(
     `
+      with viewer as (
+        select $1::uuid as id
+      )
       ${discoverAdventureSelect}
       where adventures.status = 'published'
         and adventures.visibility = 'public'
@@ -301,7 +313,8 @@ export async function listDiscoverHome(): Promise<DiscoverHomeResponse> {
         adventures.published_at desc nulls last,
         adventures.id desc
       limit 10
-    `
+    `,
+    [viewerId]
   );
 
   return {
@@ -323,6 +336,7 @@ export async function listDiscoverHome(): Promise<DiscoverHomeResponse> {
 }
 
 export async function searchDiscover(options: {
+  viewerId: string;
   query: string;
   limit: number;
   offset: number;
@@ -418,6 +432,9 @@ export async function searchDiscover(options: {
 
   const adventuresResult = await db.query<DiscoverAdventureRow>(
     `
+      with viewer as (
+        select $6::uuid as id
+      )
       ${discoverAdventureSelect}
       where adventures.status = 'published'
         and adventures.visibility = 'public'
@@ -438,7 +455,7 @@ export async function searchDiscover(options: {
       limit $1
       offset $2
     `,
-    [options.limit, options.offset, needle, options.query, prefix]
+    [options.limit, options.offset, needle, options.query, prefix, options.viewerId]
   );
 
   return {

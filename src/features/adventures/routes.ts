@@ -8,7 +8,9 @@ import { listOwnedMediaAssetsForAdventureCreate } from "../media/repository.js";
 import { checkMediaObjectExists } from "../media/storage.js";
 import {
   createAdventure,
+  deleteAdventureFavorite,
   getAdventureById,
+  insertAdventureFavorite,
   listAdventureMedia,
   listFeed
 } from "./repository.js";
@@ -173,6 +175,58 @@ export async function adventureRoutes(app: FastifyInstance): Promise<void> {
 
     return {
       items
+    };
+  });
+
+  app.post("/adventures/:id/favorite", async (request, reply) => {
+    const viewer = request.authContext?.viewer;
+    if (!viewer) {
+      return reply.code(403).send({
+        error: "Adventure favorites require a completed local account."
+      });
+    }
+
+    detailQuerySchema.parse(request.query);
+    const params = detailParamsSchema.parse(request.params);
+    const adventure = await insertAdventureFavorite({
+      viewerId: viewer.id,
+      adventureId: params.id
+    });
+
+    if (!adventure) {
+      return reply.code(404).send({
+        error: "Adventure not found."
+      });
+    }
+
+    return {
+      item: adventure
+    };
+  });
+
+  app.delete("/adventures/:id/favorite", async (request, reply) => {
+    const viewer = request.authContext?.viewer;
+    if (!viewer) {
+      return reply.code(403).send({
+        error: "Adventure favorites require a completed local account."
+      });
+    }
+
+    detailQuerySchema.parse(request.query);
+    const params = detailParamsSchema.parse(request.params);
+    const adventure = await deleteAdventureFavorite({
+      viewerId: viewer.id,
+      adventureId: params.id
+    });
+
+    if (!adventure) {
+      return reply.code(404).send({
+        error: "Adventure not found."
+      });
+    }
+
+    return {
+      item: adventure
     };
   });
 
