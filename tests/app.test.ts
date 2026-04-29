@@ -85,6 +85,7 @@ function makeAdventureRow(overrides: Record<string, unknown> = {}) {
     rating_count: 2,
     average_rating: 4.5,
     place_label: "Hidden Falls Trailhead",
+    is_favorited: false,
     distance_miles: null,
     updated_at: "2026-03-03T00:00:00.000Z",
     ...overrides
@@ -240,7 +241,8 @@ describe("buildApp", () => {
             commentCount: 3,
             ratingCount: 2,
             averageRating: 4.5
-          }
+          },
+          isFavorited: false
         }
       ],
       paging: {
@@ -310,6 +312,7 @@ describe("buildApp", () => {
             ratingCount: 2,
             averageRating: 4.5
           },
+          isFavorited: false,
           distanceMiles: 7.4
         }
       ],
@@ -430,7 +433,8 @@ describe("buildApp", () => {
                 commentCount: 118,
                 ratingCount: 847,
                 averageRating: 4.9
-              }
+              },
+              isFavorited: false
             }
           ]
         }
@@ -535,7 +539,8 @@ describe("buildApp", () => {
               commentCount: 3,
               ratingCount: 2,
               averageRating: 4.5
-            }
+            },
+            isFavorited: false
           }
         ],
         paging: {
@@ -709,7 +714,8 @@ describe("buildApp", () => {
           commentCount: 3,
           ratingCount: 2,
           averageRating: 4.5
-        }
+        },
+        isFavorited: false
       }
     });
     await app.close();
@@ -878,7 +884,7 @@ describe("buildApp", () => {
         rows: [makeProfileRow()]
       } as QueryRows<Record<string, unknown>>)
       .mockResolvedValueOnce({
-        rows: [makeAdventureRow({ author_handle: undefined, author_display_name: undefined })]
+        rows: [makeAdventureRow()]
       } as QueryRows<Record<string, unknown>>);
 
     const app = await buildApp();
@@ -938,7 +944,8 @@ describe("buildApp", () => {
             commentCount: 3,
             ratingCount: 2,
             averageRating: 4.5
-          }
+          },
+          isFavorited: false
         }
       ],
       paging: {
@@ -947,6 +954,116 @@ describe("buildApp", () => {
         returned: 1
       }
     });
+    await app.close();
+  });
+
+  it("favorites an adventure through the registered app routes", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ is_favorited: false })]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: []
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ is_favorited: true })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/favorite",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        id: "adventure-1",
+        isFavorited: true
+      })
+    });
+
+    await app.close();
+  });
+
+  it("unfavorites an adventure through the registered app routes", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ is_favorited: true })]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: []
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ is_favorited: false })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/favorite",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        id: "adventure-1",
+        isFavorited: false
+      })
+    });
+
+    await app.close();
+  });
+
+  it("returns the authenticated viewer favorites collection", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeProfileRow({
+          handle: localIdentityFixtures.connected_viewer.seededUser?.handle,
+          display_name: "Viewer"
+        })]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ is_favorited: true, place_label: "Malibu" })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/profiles/${localIdentityFixtures.connected_viewer.seededUser?.handle}/favorites?limit=1&offset=0`,
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        expect.objectContaining({
+          id: "adventure-1",
+          placeLabel: "Malibu",
+          isFavorited: true
+        })
+      ],
+      paging: {
+        limit: 1,
+        offset: 0,
+        returned: 1
+      }
+    });
+
     await app.close();
   });
 

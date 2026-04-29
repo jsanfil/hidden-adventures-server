@@ -98,7 +98,9 @@ describe("discover routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(listDiscoverHomeMock).toHaveBeenCalledWith();
+    expect(listDiscoverHomeMock).toHaveBeenCalledWith(
+      localIdentityFixtures.connected_viewer.seededUser?.id
+    );
     expect(response.json()).toEqual({
       modules: [
         {
@@ -138,6 +140,7 @@ describe("discover routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(searchDiscoverMock).toHaveBeenCalledWith({
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
       query: "Maya",
       limit: 5,
       offset: 10

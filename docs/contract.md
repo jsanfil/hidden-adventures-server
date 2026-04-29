@@ -66,6 +66,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `stats.commentCount`
   - `stats.ratingCount`
   - `stats.averageRating`
+  - `isFavorited`
   - `distanceMiles` when geo filtering is active
 
 ### `GET /api/discover/home`
@@ -104,6 +105,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - `topCategorySlugs` contains the top `1-2` canonical category slugs across the adventurer's public published adventures
 - `Popular Adventures` item shape:
   - same as `GET /api/feed`
+  - includes viewer-scoped `isFavorited`
 - `Popular Adventures` ordering:
   - favorite count descending
   - comment count descending
@@ -136,6 +138,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - same as Discover adventurer shape from `GET /api/discover/home`
 - `adventures.items` shape:
   - same as `GET /api/feed`
+  - includes viewer-scoped `isFavorited`
 - `People` search matches:
   - `handle`
   - `displayName`
@@ -173,6 +176,36 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - everything from the feed item shape
   - `updatedAt`
   - `placeLabel`
+
+### `POST /api/adventures/:id/favorite`
+
+- auth: required
+- params:
+  - `id`: UUID
+- any query param is rejected with `400`
+- response:
+  - `200` with `{ item }` when the visible published adventure is now favorited for the authenticated viewer
+  - `404` with `{ error: "Adventure not found." }` when missing or not visible
+  - `403` with `{ error: "Adventure favorites require a completed local account." }` when the bearer identity has no completed local viewer row
+- write behavior:
+  - idempotent; posting an existing favorite still succeeds
+- stable `item` shape:
+  - same as `GET /api/adventures/:id`
+
+### `DELETE /api/adventures/:id/favorite`
+
+- auth: required
+- params:
+  - `id`: UUID
+- any query param is rejected with `400`
+- response:
+  - `200` with `{ item }` when the visible published adventure is now not favorited for the authenticated viewer
+  - `404` with `{ error: "Adventure not found." }` when missing or not visible
+  - `403` with `{ error: "Adventure favorites require a completed local account." }` when the bearer identity has no completed local viewer row
+- write behavior:
+  - idempotent; deleting a missing favorite still succeeds
+- stable `item` shape:
+  - same as `GET /api/adventures/:id`
 
 ### `GET /api/adventures/:id/media`
 
@@ -231,6 +264,25 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `createdAt`
   - `updatedAt`
 - stable `adventures` item shape:
+  - same as `GET /api/feed`
+  - `placeLabel` remains `null` in the current authored-adventure payload
+
+### `GET /api/profiles/:handle/favorites`
+
+- auth: required
+- params:
+  - `handle`: non-empty string up to `64` chars
+- query:
+  - `limit`: integer, min `1`, max `50`, default `20`
+  - `offset`: integer, min `0`, default `0`
+- any extra query param is rejected with `400`
+- `viewerHandle` is rejected with `400`
+- response:
+  - `200` with `{ items, paging }`
+  - `403` with `{ error: "Forbidden." }` when `:handle` does not match the authenticated viewer handle
+- collection policy:
+  - only the authenticated viewer may read their own favorites collection
+- stable `items` shape:
   - same as `GET /api/feed`
 
 ### `GET /api/me/profile`

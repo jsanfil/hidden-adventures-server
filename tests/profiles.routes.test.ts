@@ -7,15 +7,24 @@ import {
   localIdentityFixtures
 } from "../src/features/auth/local-fixtures.js";
 
+vi.mock("../src/config/env.js", () => ({
+  env: {
+    AUTH_MODE: "local_identity",
+    SERVER_RUNTIME_MODE: "local_automation_test_core"
+  }
+}));
+
 const {
   getProfileByHandleMock,
   getProfileByUserIdMock,
   listProfileAdventuresMock,
+  listProfileFavoritesMock,
   updateMyProfileMock
 } = vi.hoisted(() => ({
   getProfileByHandleMock: vi.fn(),
   getProfileByUserIdMock: vi.fn(),
   listProfileAdventuresMock: vi.fn(),
+  listProfileFavoritesMock: vi.fn(),
   updateMyProfileMock: vi.fn()
 }));
 
@@ -23,6 +32,7 @@ vi.mock("../src/features/profiles/repository.js", () => ({
   getProfileByHandle: getProfileByHandleMock,
   getProfileByUserId: getProfileByUserIdMock,
   listProfileAdventures: listProfileAdventuresMock,
+  listProfileFavorites: listProfileFavoritesMock,
   updateMyProfile: updateMyProfileMock
 }));
 
@@ -45,7 +55,8 @@ async function buildProfileRouteApp(viewerId?: string) {
       ? {
           identity: localIdentityFixtures.connected_viewer.identity,
           viewer: {
-            id: viewerId
+            id: viewerId,
+            handle: localIdentityFixtures.connected_viewer.seededUser?.handle
           }
         }
       : null;
@@ -60,6 +71,7 @@ describe("profile routes", () => {
     getProfileByHandleMock.mockReset();
     getProfileByUserIdMock.mockReset();
     listProfileAdventuresMock.mockReset();
+    listProfileFavoritesMock.mockReset();
     updateMyProfileMock.mockReset();
   });
 
@@ -217,6 +229,83 @@ describe("profile routes", () => {
         handle: "viewer_handle"
       })
     });
+
+    await app.close();
+  });
+
+  it("returns the authenticated viewer favorites collection", async () => {
+    listProfileFavoritesMock.mockResolvedValue([
+      {
+        id: "adventure-1",
+        title: "Quiet Ridge",
+        description: "Best at sunset.",
+        categorySlug: "viewpoints",
+        visibility: "public",
+        createdAt: "2026-03-01T00:00:00.000Z",
+        publishedAt: "2026-03-02T00:00:00.000Z",
+        location: null,
+        placeLabel: "Malibu",
+        author: {
+          handle: localIdentityFixtures.connected_viewer.seededUser?.handle ?? "viewer",
+          displayName: "Viewer",
+          homeCity: "Los Angeles",
+          homeRegion: "CA"
+        },
+        primaryMedia: null,
+        stats: {
+          favoriteCount: 4,
+          commentCount: 1,
+          ratingCount: 2,
+          averageRating: 4.5
+        },
+        isFavorited: true
+      }
+    ]);
+
+    const app = await buildProfileRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/profiles/${localIdentityFixtures.connected_viewer.seededUser?.handle}/favorites?limit=1&offset=0`
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listProfileFavoritesMock).toHaveBeenCalledWith({
+      profileHandle: localIdentityFixtures.connected_viewer.seededUser?.handle,
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
+      limit: 1,
+      offset: 0
+    });
+    expect(response.json()).toEqual({
+      items: [
+        expect.objectContaining({
+          id: "adventure-1",
+          isFavorited: true
+        })
+      ],
+      paging: {
+        limit: 1,
+        offset: 0,
+        returned: 1
+      }
+    });
+
+    await app.close();
+  });
+
+  it("rejects favorites requests for another viewer handle", async () => {
+    const app = await buildProfileRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/profiles/another-user/favorites"
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "Forbidden."
+    });
+    expect(listProfileFavoritesMock).not.toHaveBeenCalled();
 
     await app.close();
   });

@@ -62,12 +62,13 @@ describe("discover repository", () => {
             rating_count: 847,
             average_rating: 4.9,
             place_label: "Columbia River Gorge, OR",
-            distance_miles: null
+            distance_miles: null,
+            is_favorited: true
           }
         ]
       });
 
-    const result = await listDiscoverHome();
+    const result = await listDiscoverHome("viewer-1");
 
     expect(result).toEqual({
       modules: [
@@ -128,7 +129,8 @@ describe("discover repository", () => {
                 commentCount: 118,
                 ratingCount: 847,
                 averageRating: 4.9
-              }
+              },
+              isFavorited: true
             }
           ]
         }
@@ -148,7 +150,7 @@ describe("discover repository", () => {
         rows: []
       });
 
-    await listDiscoverHome();
+    await listDiscoverHome("viewer-1");
 
     expect(dbMock.query.mock.calls[0]?.[0]).toContain("array_agg(top_categories.category_slug order by");
     expect(dbMock.query.mock.calls[0]?.[0]).toContain("group by category_slug");
@@ -197,12 +199,14 @@ describe("discover repository", () => {
             rating_count: 847,
             average_rating: 4.9,
             place_label: "Columbia River Gorge, OR",
-            distance_miles: null
+            distance_miles: null,
+            is_favorited: false
           }
         ]
       });
 
     const result = await searchDiscover({
+      viewerId: "viewer-1",
       query: "Maya",
       limit: 5,
       offset: 10
@@ -222,13 +226,14 @@ describe("discover repository", () => {
         items: [
           expect.objectContaining({
             id: "adventure-1",
-            title: "Eagle Creek Trail to Tunnel Falls"
+            title: "Eagle Creek Trail to Tunnel Falls",
+            isFavorited: false
           })
         ]
       }
     });
     expect(dbMock.query.mock.calls[0]?.[1]).toEqual([5, 10, "%Maya%", "Maya", "Maya%"]);
-    expect(dbMock.query.mock.calls[1]?.[1]).toEqual([5, 10, "%Maya%", "Maya", "Maya%"]);
+    expect(dbMock.query.mock.calls[1]?.[1]).toEqual([5, 10, "%Maya%", "Maya", "Maya%", "viewer-1"]);
     expect(dbMock.query.mock.calls[0]?.[0]).toContain("users.handle ilike $3");
     expect(dbMock.query.mock.calls[1]?.[0]).toContain("adventures.place_label");
   });
@@ -243,6 +248,7 @@ describe("discover repository", () => {
       });
 
     await searchDiscover({
+      viewerId: "viewer-1",
       query: "Maya",
       limit: 5,
       offset: 0

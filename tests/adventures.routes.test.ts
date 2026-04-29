@@ -8,7 +8,9 @@ const {
   dbMock,
   checkMediaObjectExistsMock,
   createAdventureMock,
+  deleteAdventureFavoriteMock,
   getAdventureByIdMock,
+  insertAdventureFavoriteMock,
   listAdventureMediaMock,
   listFeedMock
 } = vi.hoisted(() => ({
@@ -17,7 +19,9 @@ const {
   },
   checkMediaObjectExistsMock: vi.fn(),
   createAdventureMock: vi.fn(),
+  deleteAdventureFavoriteMock: vi.fn(),
   getAdventureByIdMock: vi.fn(),
+  insertAdventureFavoriteMock: vi.fn(),
   listAdventureMediaMock: vi.fn(),
   listFeedMock: vi.fn()
 }));
@@ -32,7 +36,9 @@ const { listOwnedMediaAssetsForAdventureCreateMock } = vi.hoisted(() => ({
 
 vi.mock("../src/features/adventures/repository.js", () => ({
   createAdventure: createAdventureMock,
+  deleteAdventureFavorite: deleteAdventureFavoriteMock,
   getAdventureById: getAdventureByIdMock,
+  insertAdventureFavorite: insertAdventureFavoriteMock,
   listAdventureMedia: listAdventureMediaMock,
   listFeed: listFeedMock
 }));
@@ -71,7 +77,8 @@ async function buildAdventureRouteApp(viewerId?: string) {
       ? {
           identity: localIdentityFixtures.connected_viewer.identity,
           viewer: {
-            id: viewerId
+            id: viewerId,
+            handle: localIdentityFixtures.connected_viewer.seededUser?.handle
           }
         }
       : null;
@@ -89,6 +96,8 @@ describe("adventure routes", () => {
     );
     listFeedMock.mockReset();
     createAdventureMock.mockReset();
+    insertAdventureFavoriteMock.mockReset();
+    deleteAdventureFavoriteMock.mockReset();
     getAdventureByIdMock.mockReset();
     listAdventureMediaMock.mockReset();
     listOwnedMediaAssetsForAdventureCreateMock.mockReset();
@@ -349,6 +358,191 @@ describe("adventure routes", () => {
       error: "Authentication required."
     });
     expect(getAdventureByIdMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("favorites an adventure and returns the hydrated item", async () => {
+    insertAdventureFavoriteMock.mockResolvedValue({
+      id: "adventure-1",
+      title: "Hidden Falls",
+      description: "Bring water and wear good shoes.",
+      categorySlug: "water_spots",
+      visibility: "public",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      publishedAt: "2026-03-02T00:00:00.000Z",
+      updatedAt: "2026-03-03T00:00:00.000Z",
+      placeLabel: "Hidden Falls Trailhead",
+      location: null,
+      author: {
+        handle: "jacksanfil",
+        displayName: "Jack",
+        homeCity: "Los Angeles",
+        homeRegion: "CA"
+      },
+      primaryMedia: null,
+      stats: {
+        favoriteCount: 1,
+        commentCount: 0,
+        ratingCount: 0,
+        averageRating: 0
+      },
+      isFavorited: true
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/favorite"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(insertAdventureFavoriteMock).toHaveBeenCalledWith({
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
+      adventureId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
+    });
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        id: "adventure-1",
+        isFavorited: true
+      })
+    });
+
+    await app.close();
+  });
+
+  it("treats duplicate favorite posts as idempotent", async () => {
+    insertAdventureFavoriteMock.mockResolvedValue({
+      id: "adventure-1",
+      title: "Hidden Falls",
+      description: "Bring water and wear good shoes.",
+      categorySlug: "water_spots",
+      visibility: "public",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      publishedAt: "2026-03-02T00:00:00.000Z",
+      updatedAt: "2026-03-03T00:00:00.000Z",
+      placeLabel: "Hidden Falls Trailhead",
+      location: null,
+      author: {
+        handle: "jacksanfil",
+        displayName: "Jack",
+        homeCity: "Los Angeles",
+        homeRegion: "CA"
+      },
+      primaryMedia: null,
+      stats: {
+        favoriteCount: 1,
+        commentCount: 0,
+        ratingCount: 0,
+        averageRating: 0
+      },
+      isFavorited: true
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/favorite"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        isFavorited: true
+      })
+    });
+
+    await app.close();
+  });
+
+  it("unfavorites an adventure and returns the hydrated item", async () => {
+    deleteAdventureFavoriteMock.mockResolvedValue({
+      id: "adventure-1",
+      title: "Hidden Falls",
+      description: "Bring water and wear good shoes.",
+      categorySlug: "water_spots",
+      visibility: "public",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      publishedAt: "2026-03-02T00:00:00.000Z",
+      updatedAt: "2026-03-03T00:00:00.000Z",
+      placeLabel: "Hidden Falls Trailhead",
+      location: null,
+      author: {
+        handle: "jacksanfil",
+        displayName: "Jack",
+        homeCity: "Los Angeles",
+        homeRegion: "CA"
+      },
+      primaryMedia: null,
+      stats: {
+        favoriteCount: 0,
+        commentCount: 0,
+        ratingCount: 0,
+        averageRating: 0
+      },
+      isFavorited: false
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/favorite"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(deleteAdventureFavoriteMock).toHaveBeenCalledWith({
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
+      adventureId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab"
+    });
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        isFavorited: false
+      })
+    });
+
+    await app.close();
+  });
+
+  it("treats missing favorite deletes as idempotent", async () => {
+    deleteAdventureFavoriteMock.mockResolvedValue({
+      id: "adventure-1",
+      title: "Hidden Falls",
+      description: "Bring water and wear good shoes.",
+      categorySlug: "water_spots",
+      visibility: "public",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      publishedAt: "2026-03-02T00:00:00.000Z",
+      updatedAt: "2026-03-03T00:00:00.000Z",
+      placeLabel: "Hidden Falls Trailhead",
+      location: null,
+      author: {
+        handle: "jacksanfil",
+        displayName: "Jack",
+        homeCity: "Los Angeles",
+        homeRegion: "CA"
+      },
+      primaryMedia: null,
+      stats: {
+        favoriteCount: 0,
+        commentCount: 0,
+        ratingCount: 0,
+        averageRating: 0
+      },
+      isFavorited: false
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/favorite"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        isFavorited: false
+      })
+    });
 
     await app.close();
   });

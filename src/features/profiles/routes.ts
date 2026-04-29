@@ -6,6 +6,7 @@ import {
   getProfileByHandle,
   getProfileByUserId,
   listProfileAdventures,
+  listProfileFavorites,
   updateMyProfile,
   type MeProfileUpdateRequest
 } from "./repository.js";
@@ -66,6 +67,38 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
         limit: query.limit,
         offset: query.offset,
         returned: adventures.length
+      }
+    };
+  });
+
+  app.get("/profiles/:handle/favorites", async (request, reply) => {
+    const viewer = requireViewer(request, reply);
+    if (!viewer) {
+      return reply;
+    }
+
+    const params = profileParamsSchema.parse(request.params);
+    const query = profileQuerySchema.parse(request.query);
+
+    if (params.handle !== viewer.handle) {
+      return reply.code(403).send({
+        error: "Forbidden."
+      });
+    }
+
+    const items = await listProfileFavorites({
+      profileHandle: params.handle,
+      viewerId: viewer.id,
+      limit: query.limit,
+      offset: query.offset
+    });
+
+    return {
+      items,
+      paging: {
+        limit: query.limit,
+        offset: query.offset,
+        returned: items.length
       }
     };
   });
