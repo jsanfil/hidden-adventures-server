@@ -10,17 +10,19 @@ const ServerRuntimeModeSchema = z.enum([
   "production"
 ]);
 
+const emptyStringToUndefined = (value: unknown) => (value === "" ? undefined : value);
+
 const EnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  PORT: z.coerce.number().int().positive().default(3000),
-  LOG_LEVEL: z.string().default("info"),
-  POSTGRES_HOST: z.string().default("localhost"),
-  POSTGRES_PORT: z.coerce.number().int().positive().default(5432),
-  POSTGRES_DB: z.string().default("hidden_adventures"),
-  POSTGRES_USER: z.string().default("hidden_adventures"),
-  POSTGRES_PASSWORD: z.string().default("hidden_adventures"),
-  AUTH_MODE: AuthModeSchema.optional(),
-  SERVER_RUNTIME_MODE: ServerRuntimeModeSchema.optional(),
+  NODE_ENV: z.preprocess(emptyStringToUndefined, z.enum(["development", "test", "production"]).default("development")),
+  PORT: z.preprocess(emptyStringToUndefined, z.coerce.number().int().positive().default(3000)),
+  LOG_LEVEL: z.preprocess(emptyStringToUndefined, z.string().default("info")),
+  POSTGRES_HOST: z.preprocess(emptyStringToUndefined, z.string().default("localhost")),
+  POSTGRES_PORT: z.preprocess(emptyStringToUndefined, z.coerce.number().int().positive().default(5432)),
+  POSTGRES_DB: z.preprocess(emptyStringToUndefined, z.string().default("hidden_adventures")),
+  POSTGRES_USER: z.preprocess(emptyStringToUndefined, z.string().default("hidden_adventures")),
+  POSTGRES_PASSWORD: z.preprocess(emptyStringToUndefined, z.string().default("hidden_adventures")),
+  AUTH_MODE: z.preprocess(emptyStringToUndefined, AuthModeSchema.optional()),
+  SERVER_RUNTIME_MODE: z.preprocess(emptyStringToUndefined, ServerRuntimeModeSchema.optional()),
   COGNITO_USER_POOL_ID: z.string().optional(),
   COGNITO_CLIENT_ID: z.string().optional(),
   AWS_REGION: z.string().default("us-west-2"),

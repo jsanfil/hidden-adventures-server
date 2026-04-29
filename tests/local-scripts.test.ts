@@ -41,7 +41,7 @@ describe("local backup and seed scripts", () => {
 
     expect(backupDir).toBe("/Users/tester/.hidden-adventures/backups/postgres");
     expect(outputPath).toContain("/Users/tester/.hidden-adventures/backups/postgres/");
-    expect(outputPath).toContain("hidden-adventures-local-2026-03-29T17-00-00-000Z.dump");
+    expect(outputPath).toContain("hidden-adventures-hidden_adventures_test-2026-03-29T17-00-00-000Z.dump");
   });
 
   it("creates a backup before mutating local fixtures", async () => {
