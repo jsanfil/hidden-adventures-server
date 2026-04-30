@@ -223,6 +223,50 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `width`
   - `height`
 
+### `GET /api/adventures/:id/comments`
+
+- auth: required
+- params:
+  - `id`: UUID
+- query:
+  - `limit`: integer, min `1`, max `50`, default `20`
+  - `offset`: integer, min `0`, default `0`
+- any extra query param is rejected with `400`
+- response:
+  - `200` with `{ items, paging }` when the adventure is visible to the caller
+  - `404` with `{ error: "Adventure not found." }` when missing or not visible
+- stable comment item fields:
+  - `id`
+  - `body`
+  - `createdAt`
+  - `updatedAt`
+  - `author.handle`
+  - `author.displayName`
+  - `author.homeCity`
+  - `author.homeRegion`
+- comment author fields are read from current profile/user state
+- ordering:
+  - `createdAt` ascending
+  - stable id tie-break
+
+### `POST /api/adventures/:id/comments`
+
+- auth: required
+- params:
+  - `id`: UUID
+- body:
+  - `body`: trimmed string, min `1`, max `2000`
+- any extra query param or body field is rejected with `400`
+- response:
+  - `201` with `{ item }` when the visible published adventure receives the new comment
+  - `404` with `{ error: "Adventure not found." }` when missing or not visible
+  - `403` with `{ error: "Adventure comments require a completed local account." }` when the bearer identity has no completed local viewer row
+- write behavior:
+  - creates an active comment owned by the authenticated viewer
+  - refreshes `stats.commentCount` through `adventure_stats`
+- stable `item` shape:
+  - same as `GET /api/adventures/:id/comments` item fields
+
 ### `GET /api/media/:id`
 
 - auth: required
@@ -419,6 +463,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 ## Payload Assumptions The iOS Thread May Rely On
 
 - All response objects use camelCase JSON keys.
+- All API timestamp fields are normalized ISO-8601 UTC strings with trailing `Z`.
 - Zod validation failures return `400` with `{ error: "Invalid request.", details: [{ path, message }] }`.
 - Media objects are either `null` or `{ id, storageKey }`.
 - `primaryMedia.id` is the stable feed-card media reference in Slice 1.

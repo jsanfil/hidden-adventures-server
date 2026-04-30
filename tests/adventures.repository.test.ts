@@ -12,9 +12,11 @@ vi.mock("../src/db/client.js", () => ({
 
 import {
   createAdventure,
+  createAdventureComment,
   deleteAdventureFavorite,
   getAdventureById,
   insertAdventureFavorite,
+  listAdventureComments,
   listAdventureMedia,
   listFeed
 } from "../src/features/adventures/repository.js";
@@ -33,7 +35,7 @@ describe("adventures repository", () => {
           description: null,
           category_slug: "viewpoints",
           visibility: "public",
-          created_at: "2026-03-01T00:00:00.000Z",
+          created_at: "2026-03-01 00:00:00+00",
           published_at: null,
           latitude: null,
           longitude: null,
@@ -343,6 +345,75 @@ describe("adventures repository", () => {
     );
   });
 
+  it("returns ordered comments for a visible adventure using current profile fields", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [{ id: "adventure-1" }]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "comment-1",
+            body: "Saving this for the weekend.",
+            created_at: "2026-03-07 02:00:00-08:00",
+            updated_at: "2026-03-07 03:15:00-08:00",
+            author_handle: "asanfil",
+            author_display_name: "Anthony",
+            author_home_city: "Los Angeles",
+            author_home_region: "CA"
+          }
+        ]
+      });
+
+    const result = await listAdventureComments({
+      adventureId: "4b5edc1d-f292-45b4-8972-7b977ebf5298",
+      viewerId: "viewer-123",
+      limit: 20,
+      offset: 0
+    });
+
+    expect(result).toEqual([
+      {
+        id: "comment-1",
+        body: "Saving this for the weekend.",
+        createdAt: "2026-03-07T10:00:00.000Z",
+        updatedAt: "2026-03-07T11:15:00.000Z",
+        author: {
+          handle: "asanfil",
+          displayName: "Anthony",
+          homeCity: "Los Angeles",
+          homeRegion: "CA"
+        }
+      }
+    ]);
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("where adventures.id = $2::uuid"),
+      ["viewer-123", "4b5edc1d-f292-45b4-8972-7b977ebf5298"]
+    );
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("from public.adventure_comments adventure_comments"),
+      ["4b5edc1d-f292-45b4-8972-7b977ebf5298", 20, 0]
+    );
+  });
+
+  it("returns null for comments when the adventure is not visible", async () => {
+    dbMock.query.mockResolvedValueOnce({
+      rows: []
+    });
+
+    const result = await listAdventureComments({
+      adventureId: "4b5edc1d-f292-45b4-8972-7b977ebf5298",
+      viewerId: "viewer-123",
+      limit: 20,
+      offset: 0
+    });
+
+    expect(result).toBeNull();
+    expect(dbMock.query).toHaveBeenCalledTimes(1);
+  });
+
   it("creates an adventure and ordered media rows in one transaction", async () => {
     const client = {
       query: vi.fn()
@@ -569,6 +640,83 @@ describe("adventures repository", () => {
       2,
       expect.stringContaining("delete from public.adventure_favorites"),
       ["viewer-123", "4b5edc1d-f292-45b4-8972-7b977ebf5298"]
+    );
+  });
+
+  it("creates a comment for a visible adventure and updates comment stats", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            title: "Quiet Ridge",
+            description: null,
+            category_slug: "viewpoints",
+            visibility: "public",
+            created_at: "2026-03-01T00:00:00.000Z",
+            published_at: null,
+            latitude: null,
+            longitude: null,
+            author_handle: "jacksanfil",
+            author_display_name: null,
+            author_home_city: null,
+            author_home_region: null,
+            primary_media_id: null,
+            primary_media_storage_key: null,
+            favorite_count: 1,
+            comment_count: 0,
+            rating_count: 0,
+            average_rating: 0,
+            place_label: null,
+            updated_at: "2026-03-03T00:00:00.000Z",
+            is_favorited: false
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "comment-1",
+            body: "Saving this for the weekend.",
+            created_at: "2026-03-07 02:00:00-08:00",
+            updated_at: "2026-03-07 03:15:00-08:00",
+            author_handle: "asanfil",
+            author_display_name: "Anthony",
+            author_home_city: "Los Angeles",
+            author_home_region: "CA"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await createAdventureComment({
+      adventureId: "4b5edc1d-f292-45b4-8972-7b977ebf5298",
+      authorUserId: "viewer-123",
+      body: "Saving this for the weekend."
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      id: "comment-1",
+      body: "Saving this for the weekend.",
+      createdAt: "2026-03-07T10:00:00.000Z",
+      updatedAt: "2026-03-07T11:15:00.000Z",
+      author: expect.objectContaining({
+        handle: "asanfil"
+      })
+    }));
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("insert into public.adventure_comments"),
+      expect.arrayContaining([
+        "4b5edc1d-f292-45b4-8972-7b977ebf5298",
+        "viewer-123",
+        "Saving this for the weekend."
+      ])
+    );
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("comment_count = excluded.comment_count"),
+      ["4b5edc1d-f292-45b4-8972-7b977ebf5298"]
     );
   });
 });

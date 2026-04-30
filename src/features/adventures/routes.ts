@@ -8,9 +8,11 @@ import { listOwnedMediaAssetsForAdventureCreate } from "../media/repository.js";
 import { checkMediaObjectExists } from "../media/storage.js";
 import {
   createAdventure,
+  createAdventureComment,
   deleteAdventureFavorite,
   getAdventureById,
   insertAdventureFavorite,
+  listAdventureComments,
   listAdventureMedia,
   listFeed
 } from "./repository.js";
@@ -46,9 +48,18 @@ const feedQuerySchema = z.object({
 
 const detailQuerySchema = z.object({}).strict();
 
+const commentsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  offset: z.coerce.number().int().min(0).default(0)
+}).strict();
+
 const detailParamsSchema = z.object({
   id: z.string().uuid()
 });
+
+const createCommentBodySchema = z.object({
+  body: z.string().trim().min(1).max(2_000)
+}).strict();
 
 const createAdventureBodySchema = z.object({
   title: z.string().trim().min(1).max(160),
@@ -176,6 +187,60 @@ export async function adventureRoutes(app: FastifyInstance): Promise<void> {
     return {
       items
     };
+  });
+
+  app.get("/adventures/:id/comments", async (request, reply) => {
+    const query = commentsQuerySchema.parse(request.query);
+    const params = detailParamsSchema.parse(request.params);
+    const comments = await listAdventureComments({
+      adventureId: params.id,
+      viewerId: request.authContext?.viewer?.id,
+      limit: query.limit,
+      offset: query.offset
+    });
+
+    if (!comments) {
+      return reply.code(404).send({
+        error: "Adventure not found."
+      });
+    }
+
+    return {
+      items: comments,
+      paging: {
+        limit: query.limit,
+        offset: query.offset,
+        returned: comments.length
+      }
+    };
+  });
+
+  app.post("/adventures/:id/comments", async (request, reply) => {
+    const viewer = request.authContext?.viewer;
+    if (!viewer) {
+      return reply.code(403).send({
+        error: "Adventure comments require a completed local account."
+      });
+    }
+
+    detailQuerySchema.parse(request.query);
+    const params = detailParamsSchema.parse(request.params);
+    const body = createCommentBodySchema.parse(request.body);
+    const comment = await createAdventureComment({
+      adventureId: params.id,
+      authorUserId: viewer.id,
+      body: body.body
+    });
+
+    if (!comment) {
+      return reply.code(404).send({
+        error: "Adventure not found."
+      });
+    }
+
+    return reply.code(201).send({
+      item: comment
+    });
   });
 
   app.post("/adventures/:id/favorite", async (request, reply) => {

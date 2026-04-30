@@ -1,6 +1,7 @@
 import type { PoolClient, QueryResult, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
+import { normalizeApiTimestamp, type ApiTimestampInput } from "../../lib/api-timestamp.js";
 import type { AdventureCard } from "../adventures/repository.js";
 import { toApiAdventureVisibility } from "../adventures/visibility.js";
 
@@ -17,8 +18,8 @@ type ProfileRow = QueryResultRow & {
   avatar_storage_key: string | null;
   cover_media_id: string | null;
   cover_storage_key: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: ApiTimestampInput;
+  updated_at: ApiTimestampInput;
 };
 
 type ProfileAdventureRow = QueryResultRow & {
@@ -27,8 +28,8 @@ type ProfileAdventureRow = QueryResultRow & {
   description: string | null;
   category_slug: string | null;
   visibility: string;
-  created_at: string;
-  published_at: string | null;
+  created_at: ApiTimestampInput;
+  published_at: ApiTimestampInput | null;
   latitude: number | null;
   longitude: number | null;
   author_handle: string;
@@ -118,8 +119,8 @@ function mapProfile(row: ProfileRow): ProfileDetail {
             storageKey: row.cover_storage_key
           }
         : null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    createdAt: normalizeApiTimestamp(row.created_at)!,
+    updatedAt: normalizeApiTimestamp(row.updated_at)!
   };
 }
 
@@ -135,8 +136,8 @@ function mapProfileAdventure(
     description: row.description,
     categorySlug: row.category_slug,
     visibility: toApiAdventureVisibility(row.visibility),
-    createdAt: row.created_at,
-    publishedAt: row.published_at,
+    createdAt: normalizeApiTimestamp(row.created_at)!,
+    publishedAt: normalizeApiTimestamp(row.published_at),
     location:
       row.latitude !== null && row.longitude !== null
         ? {
@@ -210,8 +211,8 @@ async function getProfileByWhereClause(
         avatar.storage_key as avatar_storage_key,
         cover.id::text as cover_media_id,
         cover.storage_key as cover_storage_key,
-        coalesce(profiles.created_at, users.created_at)::text as created_at,
-        coalesce(profiles.updated_at, users.updated_at)::text as updated_at
+        coalesce(profiles.created_at, users.created_at) as created_at,
+        coalesce(profiles.updated_at, users.updated_at) as updated_at
       from public.users users
       left join public.profiles profiles
         on profiles.user_id = users.id
@@ -287,8 +288,8 @@ export async function updateMyProfile(
         avatar.storage_key as avatar_storage_key,
         cover.id::text as cover_media_id,
         cover.storage_key as cover_storage_key,
-        coalesce(profiles.created_at, users.created_at)::text as created_at,
-        coalesce(profiles.updated_at, users.updated_at)::text as updated_at
+        coalesce(profiles.created_at, users.created_at) as created_at,
+        coalesce(profiles.updated_at, users.updated_at) as updated_at
       from upserted
       join public.users users
         on users.id = upserted.user_id
@@ -335,8 +336,8 @@ export async function listProfileAdventures(options: {
         adventures.description,
         adventures.category_slug,
         adventures.visibility::text as visibility,
-        adventures.created_at::text as created_at,
-        adventures.published_at::text as published_at,
+        adventures.created_at as created_at,
+        adventures.published_at as published_at,
         st_y(adventures.location::geometry) as latitude,
         st_x(adventures.location::geometry) as longitude,
         author.handle as author_handle,
@@ -403,8 +404,8 @@ export async function listProfileFavorites(options: {
         adventures.description,
         adventures.category_slug,
         adventures.visibility::text as visibility,
-        adventures.created_at::text as created_at,
-        adventures.published_at::text as published_at,
+        adventures.created_at as created_at,
+        adventures.published_at as published_at,
         st_y(adventures.location::geometry) as latitude,
         st_x(adventures.location::geometry) as longitude,
         users.handle as author_handle,

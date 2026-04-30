@@ -1,6 +1,7 @@
 import type { PoolClient, QueryResult, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
+import { normalizeApiTimestamp, type ApiTimestampInput } from "../../lib/api-timestamp.js";
 import { visibilityClause } from "../adventures/repository.js";
 
 type Queryable = PoolClient | typeof db;
@@ -43,7 +44,7 @@ type MediaDeliveryRow = QueryResultRow & {
   byte_size: number | null;
   width: number | null;
   height: number | null;
-  updated_at: string;
+  updated_at: ApiTimestampInput;
 };
 
 export type MediaDeliveryTarget = {
@@ -196,7 +197,7 @@ export async function getMediaDeliveryTarget(options: {
         media_assets.byte_size,
         media_assets.width,
         media_assets.height,
-        media_assets.updated_at::text as updated_at
+        media_assets.updated_at as updated_at
       from public.media_assets media_assets
       where media_assets.id = $2::uuid
         and media_assets.deleted_at is null
@@ -235,6 +236,6 @@ export async function getMediaDeliveryTarget(options: {
     byteSize: row.byte_size,
     width: row.width,
     height: row.height,
-    updatedAt: row.updated_at
+    updatedAt: normalizeApiTimestamp(row.updated_at)!
   };
 }

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient, QueryResult, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
+import { normalizeApiTimestamp, type ApiTimestampInput } from "../../lib/api-timestamp.js";
 import { toApiAdventureVisibility } from "./visibility.js";
 
 type Queryable = PoolClient | typeof db;
@@ -13,8 +14,8 @@ type AdventureFeedRow = QueryResultRow & {
   description: string | null;
   category_slug: string | null;
   visibility: string;
-  created_at: string;
-  published_at: string | null;
+  created_at: ApiTimestampInput;
+  published_at: ApiTimestampInput | null;
   latitude: number | null;
   longitude: number | null;
   author_handle: string;
@@ -80,7 +81,7 @@ export type FeedListResult = {
 
 type AdventureDetailRow = AdventureFeedRow & {
   place_label: string | null;
-  updated_at: string;
+  updated_at: ApiTimestampInput;
 };
 
 type AdventureMediaRow = QueryResultRow & {
@@ -91,12 +92,36 @@ type AdventureMediaRow = QueryResultRow & {
   height: number | null;
 };
 
+type AdventureCommentRow = QueryResultRow & {
+  id: string;
+  body: string;
+  created_at: ApiTimestampInput;
+  updated_at: ApiTimestampInput;
+  author_handle: string;
+  author_display_name: string | null;
+  author_home_city: string | null;
+  author_home_region: string | null;
+};
+
 export type AdventureMediaItem = {
   id: string;
   sortOrder: number;
   isPrimary: boolean;
   width: number | null;
   height: number | null;
+};
+
+export type AdventureComment = {
+  id: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  author: {
+    handle: string;
+    displayName: string | null;
+    homeCity: string | null;
+    homeRegion: string | null;
+  };
 };
 
 export type AdventureCreateMediaInput = {
@@ -150,8 +175,8 @@ function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
     description: row.description,
     categorySlug: row.category_slug,
     visibility: toApiAdventureVisibility(row.visibility),
-    createdAt: row.created_at,
-    publishedAt: row.published_at,
+    createdAt: normalizeApiTimestamp(row.created_at)!,
+    publishedAt: normalizeApiTimestamp(row.published_at),
     location:
       row.latitude !== null && row.longitude !== null
         ? {
@@ -181,6 +206,21 @@ function mapAdventureCard(row: AdventureFeedRow): AdventureCard {
     },
     isFavorited: row.is_favorited ?? false,
     ...(distanceMiles !== null && distanceMiles !== undefined ? { distanceMiles } : {})
+  };
+}
+
+function mapAdventureComment(row: AdventureCommentRow): AdventureComment {
+  return {
+    id: row.id,
+    body: row.body,
+    createdAt: normalizeApiTimestamp(row.created_at)!,
+    updatedAt: normalizeApiTimestamp(row.updated_at)!,
+    author: {
+      handle: row.author_handle,
+      displayName: row.author_display_name,
+      homeCity: row.author_home_city,
+      homeRegion: row.author_home_region
+    }
   };
 }
 
@@ -214,8 +254,8 @@ const adventureBaseSelect = `
     adventures.description,
     adventures.category_slug,
     adventures.visibility::text as visibility,
-    adventures.created_at::text as created_at,
-    adventures.published_at::text as published_at,
+    adventures.created_at as created_at,
+    adventures.published_at as published_at,
     st_y(adventures.location::geometry) as latitude,
     st_x(adventures.location::geometry) as longitude,
     users.handle as author_handle,
@@ -275,7 +315,7 @@ async function getVisibleAdventureById(
         select $1::uuid as id
       )
       ${adventureBaseSelect},
-      adventures.updated_at::text as updated_at
+      adventures.updated_at as updated_at
       ${feedJoins}
       where adventures.id = $2::uuid
         and adventures.status = 'published'
@@ -293,7 +333,7 @@ async function getVisibleAdventureById(
   return {
     ...mapAdventureCard(row),
     placeLabel: row.place_label,
-    updatedAt: row.updated_at
+    updatedAt: normalizeApiTimestamp(row.updated_at)!
   };
 }
 
@@ -425,6 +465,59 @@ export async function listAdventureMedia(options: {
   }));
 }
 
+export async function listAdventureComments(options: {
+  adventureId: string;
+  viewerId?: string;
+  limit: number;
+  offset: number;
+}): Promise<AdventureComment[] | null> {
+  const visibleAdventure = await db.query<QueryResultRow>(
+    `
+      with viewer as (
+        select $1::uuid as id
+      )
+      select adventures.id
+      from public.adventures adventures
+      where adventures.id = $2::uuid
+        and adventures.status = 'published'
+        and ${visibilityClause()}
+      limit 1
+    `,
+    [options.viewerId ?? null, options.adventureId]
+  );
+
+  if (visibleAdventure.rows.length === 0) {
+    return null;
+  }
+
+  const result = await db.query<AdventureCommentRow>(
+    `
+      select
+        adventure_comments.id::text as id,
+        adventure_comments.body,
+        adventure_comments.created_at as created_at,
+        adventure_comments.updated_at as updated_at,
+        users.handle as author_handle,
+        profiles.display_name as author_display_name,
+        profiles.home_city as author_home_city,
+        profiles.home_region as author_home_region
+      from public.adventure_comments adventure_comments
+      join public.users users
+        on users.id = adventure_comments.author_user_id
+      left join public.profiles profiles
+        on profiles.user_id = users.id
+      where adventure_comments.adventure_id = $1::uuid
+        and adventure_comments.deleted_at is null
+      order by adventure_comments.created_at asc, adventure_comments.id asc
+      limit $2
+      offset $3
+    `,
+    [options.adventureId, options.limit, options.offset]
+  );
+
+  return result.rows.map(mapAdventureComment);
+}
+
 export async function createAdventure(
   input: AdventureCreateInput,
   client: PoolClient
@@ -509,6 +602,119 @@ export async function createAdventure(
     id: adventureResult.rows[0]!.id,
     status: adventureResult.rows[0]!.status
   };
+}
+
+export async function createAdventureComment(options: {
+  adventureId: string;
+  authorUserId: string;
+  body: string;
+}): Promise<AdventureComment | null> {
+  const visibleAdventure = await getVisibleAdventureById({
+    adventureId: options.adventureId,
+    viewerId: options.authorUserId
+  });
+
+  if (!visibleAdventure) {
+    return null;
+  }
+
+  const commentId = randomUUID();
+  const result = await db.query<AdventureCommentRow>(
+    `
+      with inserted_comment as (
+        insert into public.adventure_comments (
+          id,
+          adventure_id,
+          author_user_id,
+          body,
+          created_at,
+          updated_at,
+          deleted_at
+        ) values (
+          $1::uuid,
+          $2::uuid,
+          $3::uuid,
+          $4,
+          now(),
+          now(),
+          null
+        )
+        returning
+          id,
+          body,
+          created_at,
+          updated_at,
+          author_user_id
+      )
+      select
+        inserted_comment.id::text as id,
+        inserted_comment.body,
+        inserted_comment.created_at as created_at,
+        inserted_comment.updated_at as updated_at,
+        users.handle as author_handle,
+        profiles.display_name as author_display_name,
+        profiles.home_city as author_home_city,
+        profiles.home_region as author_home_region
+      from inserted_comment
+      join public.users users
+        on users.id = inserted_comment.author_user_id
+      left join public.profiles profiles
+        on profiles.user_id = users.id
+    `,
+    [commentId, options.adventureId, options.authorUserId, options.body]
+  );
+
+  await db.query(
+    `
+      insert into public.adventure_stats (
+        adventure_id,
+        favorite_count,
+        comment_count,
+        rating_count,
+        rating_sum,
+        average_rating,
+        updated_at
+      )
+      select
+        $1::uuid,
+        coalesce(favorites.favorite_count, 0),
+        coalesce(comments.comment_count, 0),
+        coalesce(ratings.rating_count, 0),
+        coalesce(ratings.rating_sum, 0),
+        coalesce(ratings.average_rating, 0),
+        now()
+      from (
+        select count(*)::int as favorite_count
+        from public.adventure_favorites
+        where adventure_id = $1::uuid
+      ) favorites
+      cross join (
+        select count(*)::int as comment_count
+        from public.adventure_comments
+        where adventure_id = $1::uuid
+          and deleted_at is null
+      ) comments
+      cross join (
+        select
+          count(*)::int as rating_count,
+          coalesce(sum(score)::double precision, 0) as rating_sum,
+          coalesce(avg(score)::double precision, 0) as average_rating
+        from public.adventure_ratings
+        where adventure_id = $1::uuid
+      ) ratings
+      on conflict (adventure_id) do update set
+        favorite_count = excluded.favorite_count,
+        comment_count = excluded.comment_count,
+        rating_count = excluded.rating_count,
+        rating_sum = excluded.rating_sum,
+        average_rating = excluded.average_rating,
+        updated_at = excluded.updated_at
+    `,
+    [options.adventureId]
+  );
+
+  const row = result.rows[0];
+  return row ? mapAdventureComment(row) : null;
 }
 
 export async function insertAdventureFavorite(

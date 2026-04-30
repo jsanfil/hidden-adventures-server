@@ -37,8 +37,8 @@ describe("profiles repository", () => {
           avatar_storage_key: null,
           cover_media_id: "cover-1",
           cover_storage_key: "profiles/cover-1.jpg",
-          created_at: "2026-01-01T00:00:00.000Z",
-          updated_at: "2026-03-01T00:00:00.000Z"
+          created_at: "2026-01-01 00:00:00+00",
+          updated_at: "2026-03-01 01:30:00+00"
         }
       ]
     });
@@ -58,7 +58,7 @@ describe("profiles repository", () => {
         storageKey: "profiles/cover-1.jpg"
       },
       createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z"
+      updatedAt: "2026-03-01T01:30:00.000Z"
     });
     expect(dbMock.query).toHaveBeenCalledWith(expect.stringContaining("where users.handle = $1"), [
       "jacksanfil"
@@ -196,8 +196,8 @@ describe("profiles repository", () => {
             description: "Best at sunset.",
             category_slug: "viewpoints",
             visibility: "public",
-            created_at: "2026-03-01T00:00:00.000Z",
-            published_at: "2026-03-02T00:00:00.000Z",
+          created_at: "2026-03-01 00:00:00+00",
+          published_at: "2026-03-02 00:00:00+00",
             latitude: 34.12,
             longitude: -118.45,
             author_handle: "jacksanfil",
