@@ -50,8 +50,8 @@ describe("auth service", () => {
             email: "legacy@example.com",
             account_origin: "legacy_profile_import",
             status: "active",
-            created_at: "2018-01-01T00:00:00.000Z",
-            updated_at: "2026-03-02T00:00:00.000Z"
+            created_at: "2018-01-01 00:00:00+00",
+            updated_at: "2026-03-02 01:45:00+00"
           }
         ]
       });
@@ -74,7 +74,7 @@ describe("auth service", () => {
         accountOrigin: "legacy_profile_import",
         status: "active",
         createdAt: "2018-01-01T00:00:00.000Z",
-        updatedAt: "2026-03-02T00:00:00.000Z"
+        updatedAt: "2026-03-02T01:45:00.000Z"
       },
       suggestedHandle: null,
       recoveryEmail: "legacy@example.com"

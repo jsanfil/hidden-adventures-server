@@ -116,7 +116,7 @@ describe("media repository", () => {
           byte_size: 1024,
           width: 512,
           height: 512,
-          updated_at: "2026-03-03T00:00:00.000Z"
+          updated_at: "2026-03-03 04:05:06+00"
         }
       ]
     });
@@ -133,7 +133,7 @@ describe("media repository", () => {
       byteSize: 1024,
       width: 512,
       height: 512,
-      updatedAt: "2026-03-03T00:00:00.000Z"
+      updatedAt: "2026-03-03T04:05:06.000Z"
     });
     expect(dbMock.query).toHaveBeenCalledWith(
       expect.stringContaining("from public.profiles profiles"),

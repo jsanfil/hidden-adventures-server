@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient, QueryResult, QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
+import { normalizeApiTimestamp, type ApiTimestampInput } from "../../lib/api-timestamp.js";
 
 export type AccountOrigin = "legacy_profile_import" | "rebuild_signup";
 
@@ -15,8 +16,8 @@ type LocalUserRow = QueryResultRow & {
   email: string | null;
   account_origin: AccountOrigin;
   status: string;
-  created_at: string;
-  updated_at: string;
+  created_at: ApiTimestampInput;
+  updated_at: ApiTimestampInput;
 };
 
 export type LocalUser = {
@@ -44,8 +45,8 @@ function mapLocalUser(row: LocalUserRow): LocalUser {
     email: row.email,
     accountOrigin: row.account_origin,
     status: row.status,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
+    createdAt: normalizeApiTimestamp(row.created_at)!,
+    updatedAt: normalizeApiTimestamp(row.updated_at)!
   };
 }
 
@@ -79,8 +80,8 @@ export async function getUserByCognitoSubject(
         email,
         account_origin,
         status,
-        created_at::text as created_at,
-        updated_at::text as updated_at
+        created_at as created_at,
+        updated_at as updated_at
       from public.users
       where cognito_subject = $1
       limit 1
@@ -103,8 +104,8 @@ export async function getUserByHandle(handle: string, client?: PoolClient): Prom
         email,
         account_origin,
         status,
-        created_at::text as created_at,
-        updated_at::text as updated_at
+        created_at as created_at,
+        updated_at as updated_at
       from public.users
       where handle = $1
       limit 1
@@ -130,8 +131,8 @@ export async function getLegacyUserByHandle(
         email,
         account_origin,
         status,
-        created_at::text as created_at,
-        updated_at::text as updated_at
+        created_at as created_at,
+        updated_at as updated_at
       from public.users
       where handle = $1
         and account_origin = 'legacy_profile_import'
@@ -158,8 +159,8 @@ export async function listLegacyUsersByEmail(
         email,
         account_origin,
         status,
-        created_at::text as created_at,
-        updated_at::text as updated_at
+        created_at as created_at,
+        updated_at as updated_at
       from public.users
       where lower(email) = lower($1)
         and account_origin = 'legacy_profile_import'
@@ -194,8 +195,8 @@ export async function linkUserToCognitoSubject(
         email,
         account_origin,
         status,
-        created_at::text as created_at,
-        updated_at::text as updated_at
+        created_at as created_at,
+        updated_at as updated_at
     `,
     [userId, cognitoSubject, email]
   );
@@ -239,8 +240,8 @@ export async function createRebuildUser(
         email,
         account_origin,
         status,
-        created_at::text as created_at,
-        updated_at::text as updated_at
+        created_at as created_at,
+        updated_at as updated_at
     `,
     [randomUUID(), input.cognitoSubject, input.handle, input.email]
   );

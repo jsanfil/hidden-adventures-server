@@ -8,9 +8,11 @@ const {
   dbMock,
   checkMediaObjectExistsMock,
   createAdventureMock,
+  createAdventureCommentMock,
   deleteAdventureFavoriteMock,
   getAdventureByIdMock,
   insertAdventureFavoriteMock,
+  listAdventureCommentsMock,
   listAdventureMediaMock,
   listFeedMock
 } = vi.hoisted(() => ({
@@ -19,9 +21,11 @@ const {
   },
   checkMediaObjectExistsMock: vi.fn(),
   createAdventureMock: vi.fn(),
+  createAdventureCommentMock: vi.fn(),
   deleteAdventureFavoriteMock: vi.fn(),
   getAdventureByIdMock: vi.fn(),
   insertAdventureFavoriteMock: vi.fn(),
+  listAdventureCommentsMock: vi.fn(),
   listAdventureMediaMock: vi.fn(),
   listFeedMock: vi.fn()
 }));
@@ -36,9 +40,11 @@ const { listOwnedMediaAssetsForAdventureCreateMock } = vi.hoisted(() => ({
 
 vi.mock("../src/features/adventures/repository.js", () => ({
   createAdventure: createAdventureMock,
+  createAdventureComment: createAdventureCommentMock,
   deleteAdventureFavorite: deleteAdventureFavoriteMock,
   getAdventureById: getAdventureByIdMock,
   insertAdventureFavorite: insertAdventureFavoriteMock,
+  listAdventureComments: listAdventureCommentsMock,
   listAdventureMedia: listAdventureMediaMock,
   listFeed: listFeedMock
 }));
@@ -60,7 +66,7 @@ vi.mock("../src/config/env.js", () => ({
 
 import { adventureRoutes } from "../src/features/adventures/routes.js";
 
-async function buildAdventureRouteApp(viewerId?: string) {
+async function buildAdventureRouteApp(viewerId?: string, options: { identityOnly?: boolean } = {}) {
   const app = Fastify();
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {
@@ -81,6 +87,11 @@ async function buildAdventureRouteApp(viewerId?: string) {
             handle: localIdentityFixtures.connected_viewer.seededUser?.handle
           }
         }
+      : options.identityOnly
+        ? {
+            identity: localIdentityFixtures.connected_viewer.identity,
+            viewer: null
+          }
       : null;
   });
 
@@ -96,9 +107,11 @@ describe("adventure routes", () => {
     );
     listFeedMock.mockReset();
     createAdventureMock.mockReset();
+    createAdventureCommentMock.mockReset();
     insertAdventureFavoriteMock.mockReset();
     deleteAdventureFavoriteMock.mockReset();
     getAdventureByIdMock.mockReset();
+    listAdventureCommentsMock.mockReset();
     listAdventureMediaMock.mockReset();
     listOwnedMediaAssetsForAdventureCreateMock.mockReset();
     checkMediaObjectExistsMock.mockReset();
@@ -631,6 +644,139 @@ describe("adventure routes", () => {
         }
       ]
     });
+
+    await app.close();
+  });
+
+  it("lists visible adventure comments with author profile fields", async () => {
+    listAdventureCommentsMock.mockResolvedValue([
+      {
+        id: "comment-1",
+        body: "Saving this for the weekend.",
+        createdAt: "2026-03-07T02:00:00.000Z",
+        updatedAt: "2026-03-07T02:00:00.000Z",
+        author: {
+          handle: "asanfil",
+          displayName: "Anthony",
+          homeCity: "Los Angeles",
+          homeRegion: "CA"
+        }
+      }
+    ]);
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/comments?limit=10&offset=0"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listAdventureCommentsMock).toHaveBeenCalledWith({
+      adventureId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+      viewerId: localIdentityFixtures.connected_viewer.seededUser?.id,
+      limit: 10,
+      offset: 0
+    });
+    expect(response.json()).toEqual({
+      items: [
+        {
+          id: "comment-1",
+          body: "Saving this for the weekend.",
+          createdAt: "2026-03-07T02:00:00.000Z",
+          updatedAt: "2026-03-07T02:00:00.000Z",
+          author: {
+            handle: "asanfil",
+            displayName: "Anthony",
+            homeCity: "Los Angeles",
+            homeRegion: "CA"
+          }
+        }
+      ],
+      paging: {
+        limit: 10,
+        offset: 0,
+        returned: 1
+      }
+    });
+
+    await app.close();
+  });
+
+  it("returns 404 when listing comments for a missing or hidden adventure", async () => {
+    listAdventureCommentsMock.mockResolvedValue(null);
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/comments"
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: "Adventure not found."
+    });
+
+    await app.close();
+  });
+
+  it("creates a comment on a visible adventure", async () => {
+    createAdventureCommentMock.mockResolvedValue({
+      id: "comment-1",
+      body: "Saving this for the weekend.",
+      createdAt: "2026-03-07T02:00:00.000Z",
+      updatedAt: "2026-03-07T02:00:00.000Z",
+      author: {
+        handle: "asanfil",
+        displayName: "Anthony",
+        homeCity: "Los Angeles",
+        homeRegion: "CA"
+      }
+    });
+
+    const app = await buildAdventureRouteApp(localIdentityFixtures.connected_viewer.seededUser?.id);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/comments",
+      payload: {
+        body: "  Saving this for the weekend.  "
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(createAdventureCommentMock).toHaveBeenCalledWith({
+      adventureId: "3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab",
+      authorUserId: localIdentityFixtures.connected_viewer.seededUser?.id,
+      body: "Saving this for the weekend."
+    });
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        id: "comment-1",
+        body: "Saving this for the weekend."
+      })
+    });
+
+    await app.close();
+  });
+
+  it("requires a completed local account to create comments", async () => {
+    const app = await buildAdventureRouteApp(undefined, { identityOnly: true });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/comments",
+      payload: {
+        body: "Saving this for the weekend."
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "Adventure comments require a completed local account."
+    });
+    expect(createAdventureCommentMock).not.toHaveBeenCalled();
 
     await app.close();
   });

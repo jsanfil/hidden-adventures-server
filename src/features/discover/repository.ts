@@ -1,6 +1,7 @@
 import type { QueryResultRow } from "pg";
 
 import { db } from "../../db/client.js";
+import { normalizeApiTimestamp, type ApiTimestampInput } from "../../lib/api-timestamp.js";
 import type { AdventureCard } from "../adventures/repository.js";
 import { toApiAdventureVisibility } from "../adventures/visibility.js";
 import type { CanonicalCategorySlug } from "../adventures/category-taxonomy.js";
@@ -25,8 +26,8 @@ type DiscoverAdventureRow = QueryResultRow & {
   description: string | null;
   category_slug: string | null;
   visibility: string;
-  created_at: string;
-  published_at: string | null;
+  created_at: ApiTimestampInput;
+  published_at: ApiTimestampInput | null;
   latitude: number | null;
   longitude: number | null;
   author_handle: string;
@@ -122,8 +123,8 @@ function mapAdventureCard(row: DiscoverAdventureRow): AdventureCard {
     description: row.description,
     categorySlug: row.category_slug,
     visibility: toApiAdventureVisibility(row.visibility),
-    createdAt: row.created_at,
-    publishedAt: row.published_at,
+    createdAt: normalizeApiTimestamp(row.created_at)!,
+    publishedAt: normalizeApiTimestamp(row.published_at),
     location:
       row.latitude !== null && row.longitude !== null
         ? {
@@ -162,8 +163,8 @@ const discoverAdventureSelect = `
     adventures.description,
     adventures.category_slug,
     adventures.visibility::text as visibility,
-    adventures.created_at::text as created_at,
-    adventures.published_at::text as published_at,
+    adventures.created_at as created_at,
+    adventures.published_at as published_at,
     st_y(adventures.location::geometry) as latitude,
     st_x(adventures.location::geometry) as longitude,
     users.handle as author_handle,
