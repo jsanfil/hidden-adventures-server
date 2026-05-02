@@ -320,13 +320,15 @@ async function insertEngagement(client: PoolClient) {
         adventure_id,
         favorite_count,
         comment_count,
+        legacy_rating_count,
+        legacy_rating_sum,
         rating_count,
         rating_sum,
         average_rating,
         updated_at
       ) values
-        ($1::uuid, 1, 1, 2, 9, 4.5, $3::timestamptz),
-        ($2::uuid, 0, 1, 0, 0, 0, $3::timestamptz)
+        ($1::uuid, 1, 1, 0, 0, 2, 9, 4.5, $3::timestamptz),
+        ($2::uuid, 0, 1, 0, 0, 0, 0, 0, $3::timestamptz)
     `,
     [
       localFixtureContent.publicAdventureId,

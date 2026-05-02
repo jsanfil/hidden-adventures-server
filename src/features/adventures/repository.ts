@@ -82,6 +82,7 @@ export type FeedListResult = {
 type AdventureDetailRow = AdventureFeedRow & {
   place_label: string | null;
   updated_at: ApiTimestampInput;
+  viewer_rating: number | null;
 };
 
 type AdventureMediaRow = QueryResultRow & {
@@ -148,6 +149,12 @@ export type AdventureCreateInput = {
 export type CreatedAdventure = {
   id: string;
   status: string;
+};
+
+export type AdventureDetail = AdventureCard & {
+  placeLabel: string | null;
+  updatedAt: string;
+  viewerRating: number | null;
 };
 
 function getExecutor(client?: PoolClient): Queryable {
@@ -222,6 +229,73 @@ function mapAdventureComment(row: AdventureCommentRow): AdventureComment {
       homeRegion: row.author_home_region
     }
   };
+}
+
+async function refreshAdventureStats(adventureId: string, client?: PoolClient): Promise<void> {
+  await runQuery(
+    client,
+    `
+      insert into public.adventure_stats (
+        adventure_id,
+        favorite_count,
+        comment_count,
+        legacy_rating_count,
+        legacy_rating_sum,
+        rating_count,
+        rating_sum,
+        average_rating,
+        updated_at
+      )
+      select
+        $1::uuid,
+        coalesce(favorites.favorite_count, 0),
+        coalesce(comments.comment_count, 0),
+        coalesce(existing_stats.legacy_rating_count, 0),
+        coalesce(existing_stats.legacy_rating_sum, 0),
+        coalesce(existing_stats.legacy_rating_count, 0) + coalesce(ratings.live_rating_count, 0),
+        coalesce(existing_stats.legacy_rating_sum, 0) + coalesce(ratings.live_rating_sum, 0),
+        case
+          when coalesce(existing_stats.legacy_rating_count, 0) + coalesce(ratings.live_rating_count, 0) > 0
+            then (
+              coalesce(existing_stats.legacy_rating_sum, 0) + coalesce(ratings.live_rating_sum, 0)
+            ) / (
+              coalesce(existing_stats.legacy_rating_count, 0) + coalesce(ratings.live_rating_count, 0)
+            )
+          else 0
+        end,
+        now()
+      from (
+        select count(*)::int as favorite_count
+        from public.adventure_favorites
+        where adventure_id = $1::uuid
+      ) favorites
+      cross join (
+        select count(*)::int as comment_count
+        from public.adventure_comments
+        where adventure_id = $1::uuid
+          and deleted_at is null
+      ) comments
+      cross join (
+        select
+          count(*)::int as live_rating_count,
+          coalesce(sum(score)::double precision, 0) as live_rating_sum
+        from public.adventure_ratings
+        where adventure_id = $1::uuid
+      ) ratings
+      left join public.adventure_stats existing_stats
+        on existing_stats.adventure_id = $1::uuid
+      on conflict (adventure_id) do update set
+        favorite_count = excluded.favorite_count,
+        comment_count = excluded.comment_count,
+        legacy_rating_count = excluded.legacy_rating_count,
+        legacy_rating_sum = excluded.legacy_rating_sum,
+        rating_count = excluded.rating_count,
+        rating_sum = excluded.rating_sum,
+        average_rating = excluded.average_rating,
+        updated_at = excluded.updated_at
+    `,
+    [adventureId]
+  );
 }
 
 export function visibilityClause(): string {
@@ -307,7 +381,7 @@ async function getVisibleAdventureById(
     viewerId?: string;
   },
   client?: PoolClient
-): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
+): Promise<AdventureDetail | null> {
   const result = await runQuery<AdventureDetailRow>(
     client,
     `
@@ -315,8 +389,12 @@ async function getVisibleAdventureById(
         select $1::uuid as id
       )
       ${adventureBaseSelect},
-      adventures.updated_at as updated_at
+      adventures.updated_at as updated_at,
+      viewer_rating.score as viewer_rating
       ${feedJoins}
+      left join public.adventure_ratings viewer_rating
+        on viewer_rating.adventure_id = adventures.id
+       and viewer_rating.user_id = $1::uuid
       where adventures.id = $2::uuid
         and adventures.status = 'published'
         and ${visibilityClause()}
@@ -333,7 +411,8 @@ async function getVisibleAdventureById(
   return {
     ...mapAdventureCard(row),
     placeLabel: row.place_label,
-    updatedAt: normalizeApiTimestamp(row.updated_at)!
+    updatedAt: normalizeApiTimestamp(row.updated_at)!,
+    viewerRating: row.viewer_rating
   };
 }
 
@@ -411,7 +490,7 @@ export async function listFeed(options: {
 export async function getAdventureById(options: {
   adventureId: string;
   viewerId?: string;
-}): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
+}): Promise<AdventureDetail | null> {
   return getVisibleAdventureById(options);
 }
 
@@ -664,54 +743,7 @@ export async function createAdventureComment(options: {
     [commentId, options.adventureId, options.authorUserId, options.body]
   );
 
-  await db.query(
-    `
-      insert into public.adventure_stats (
-        adventure_id,
-        favorite_count,
-        comment_count,
-        rating_count,
-        rating_sum,
-        average_rating,
-        updated_at
-      )
-      select
-        $1::uuid,
-        coalesce(favorites.favorite_count, 0),
-        coalesce(comments.comment_count, 0),
-        coalesce(ratings.rating_count, 0),
-        coalesce(ratings.rating_sum, 0),
-        coalesce(ratings.average_rating, 0),
-        now()
-      from (
-        select count(*)::int as favorite_count
-        from public.adventure_favorites
-        where adventure_id = $1::uuid
-      ) favorites
-      cross join (
-        select count(*)::int as comment_count
-        from public.adventure_comments
-        where adventure_id = $1::uuid
-          and deleted_at is null
-      ) comments
-      cross join (
-        select
-          count(*)::int as rating_count,
-          coalesce(sum(score)::double precision, 0) as rating_sum,
-          coalesce(avg(score)::double precision, 0) as average_rating
-        from public.adventure_ratings
-        where adventure_id = $1::uuid
-      ) ratings
-      on conflict (adventure_id) do update set
-        favorite_count = excluded.favorite_count,
-        comment_count = excluded.comment_count,
-        rating_count = excluded.rating_count,
-        rating_sum = excluded.rating_sum,
-        average_rating = excluded.average_rating,
-        updated_at = excluded.updated_at
-    `,
-    [options.adventureId]
-  );
+  await refreshAdventureStats(options.adventureId);
 
   const row = result.rows[0];
   return row ? mapAdventureComment(row) : null;
@@ -723,7 +755,7 @@ export async function insertAdventureFavorite(
     adventureId: string;
   },
   client?: PoolClient
-): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
+): Promise<AdventureDetail | null> {
   const visibleAdventure = await getVisibleAdventureById(options, client);
   if (!visibleAdventure) {
     return null;
@@ -755,7 +787,7 @@ export async function deleteAdventureFavorite(
     adventureId: string;
   },
   client?: PoolClient
-): Promise<(AdventureCard & { placeLabel: string | null; updatedAt: string }) | null> {
+): Promise<AdventureDetail | null> {
   const visibleAdventure = await getVisibleAdventureById(options, client);
   if (!visibleAdventure) {
     return null;
@@ -770,6 +802,74 @@ export async function deleteAdventureFavorite(
     `,
     [options.viewerId, options.adventureId]
   );
+
+  return getVisibleAdventureById(options, client);
+}
+
+export async function upsertAdventureRating(
+  options: {
+    viewerId: string;
+    adventureId: string;
+    score: number;
+  },
+  client?: PoolClient
+): Promise<AdventureDetail | null> {
+  const visibleAdventure = await getVisibleAdventureById(options, client);
+  if (!visibleAdventure) {
+    return null;
+  }
+
+  await runQuery(
+    client,
+    `
+      insert into public.adventure_ratings (
+        user_id,
+        adventure_id,
+        score,
+        created_at,
+        updated_at
+      ) values (
+        $1::uuid,
+        $2::uuid,
+        $3,
+        now(),
+        now()
+      )
+      on conflict (user_id, adventure_id) do update set
+        score = excluded.score,
+        updated_at = excluded.updated_at
+    `,
+    [options.viewerId, options.adventureId, options.score]
+  );
+
+  await refreshAdventureStats(options.adventureId, client);
+
+  return getVisibleAdventureById(options, client);
+}
+
+export async function deleteAdventureRating(
+  options: {
+    viewerId: string;
+    adventureId: string;
+  },
+  client?: PoolClient
+): Promise<AdventureDetail | null> {
+  const visibleAdventure = await getVisibleAdventureById(options, client);
+  if (!visibleAdventure) {
+    return null;
+  }
+
+  await runQuery(
+    client,
+    `
+      delete from public.adventure_ratings
+      where user_id = $1::uuid
+        and adventure_id = $2::uuid
+    `,
+    [options.viewerId, options.adventureId]
+  );
+
+  await refreshAdventureStats(options.adventureId, client);
 
   return getVisibleAdventureById(options, client);
 }

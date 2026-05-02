@@ -68,6 +68,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - `stats.averageRating`
   - `isFavorited`
   - `distanceMiles` when geo filtering is active
+- imported legacy adventures preserve migrated aggregate rating baseline in `stats.ratingCount` and `stats.averageRating` until rebuild-era per-user ratings are added
 
 ### `GET /api/discover/home`
 
@@ -176,6 +177,44 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
   - everything from the feed item shape
   - `updatedAt`
   - `placeLabel`
+  - `viewerRating`
+    - `null` when the authenticated viewer has no rebuild-era rating row for the adventure
+    - integer `1` through `5` when the authenticated viewer has rated the adventure
+
+### `POST /api/adventures/:id/rating`
+
+- auth: required
+- params:
+  - `id`: UUID
+- body:
+  - `score`: integer, min `1`, max `5`
+- any extra query param or body field is rejected with `400`
+- response:
+  - `200` with `{ item }` when the visible published adventure now reflects the authenticated viewer's rating
+  - `404` with `{ error: "Adventure not found." }` when missing or not visible
+  - `403` with `{ error: "Adventure ratings require a completed local account." }` when the bearer identity has no completed local viewer row
+- write behavior:
+  - upserts the authenticated viewer's single `public.adventure_ratings` row for the adventure
+  - refreshes `adventure_stats` using imported legacy baseline values plus live per-user rating rows
+- stable `item` shape:
+  - same as `GET /api/adventures/:id`
+
+### `DELETE /api/adventures/:id/rating`
+
+- auth: required
+- params:
+  - `id`: UUID
+- any extra query param or body field is rejected with `400`
+- response:
+  - `200` with `{ item }` when the visible published adventure now reflects that the authenticated viewer has no rating
+  - `404` with `{ error: "Adventure not found." }` when missing or not visible
+  - `403` with `{ error: "Adventure ratings require a completed local account." }` when the bearer identity has no completed local viewer row
+- write behavior:
+  - idempotent; deleting a missing rating still succeeds
+  - deletes only the authenticated viewer's live rating row
+  - refreshes `adventure_stats` using imported legacy baseline values plus remaining live per-user rating rows
+- stable `item` shape:
+  - same as `GET /api/adventures/:id`
 
 ### `POST /api/adventures/:id/favorite`
 
@@ -264,6 +303,7 @@ Vitest is the acceptance source for this contract. The Postman repo stays aligne
 - write behavior:
   - creates an active comment owned by the authenticated viewer
   - refreshes `stats.commentCount` through `adventure_stats`
+  - preserves imported legacy rating baseline while recomputing any live rating contribution
 - stable `item` shape:
   - same as `GET /api/adventures/:id/comments` item fields
 

@@ -443,11 +443,13 @@ async function seedStats(client: PoolClient, pack: FixturePack) {
           adventure_id,
           favorite_count,
           comment_count,
+          legacy_rating_count,
+          legacy_rating_sum,
           rating_count,
           rating_sum,
           average_rating,
           updated_at
-        ) values ($1::uuid, $2, $3, $4, $5, $6, $7::timestamptz)
+        ) values ($1::uuid, $2, $3, 0, 0, $4, $5, $6, $7::timestamptz)
       `,
       [
         fixtureAdventureId(pack, adventure.key),
