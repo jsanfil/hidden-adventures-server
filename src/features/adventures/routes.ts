@@ -10,11 +10,13 @@ import {
   createAdventure,
   createAdventureComment,
   deleteAdventureFavorite,
+  deleteAdventureRating,
   getAdventureById,
   insertAdventureFavorite,
   listAdventureComments,
   listAdventureMedia,
-  listFeed
+  listFeed,
+  upsertAdventureRating
 } from "./repository.js";
 import { toStoredAdventureVisibility } from "./visibility.js";
 
@@ -59,6 +61,12 @@ const detailParamsSchema = z.object({
 
 const createCommentBodySchema = z.object({
   body: z.string().trim().min(1).max(2_000)
+}).strict();
+
+const emptyBodySchema = z.object({}).strict();
+
+const upsertRatingBodySchema = z.object({
+  score: z.number().int().min(1).max(5)
 }).strict();
 
 const createAdventureBodySchema = z.object({
@@ -241,6 +249,71 @@ export async function adventureRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send({
       item: comment
     });
+  });
+
+  app.post("/adventures/:id/rating", async (request, reply) => {
+    const viewer = request.authContext?.viewer;
+    if (!viewer) {
+      return reply.code(403).send({
+        error: "Adventure ratings require a completed local account."
+      });
+    }
+
+    detailQuerySchema.parse(request.query);
+    const params = detailParamsSchema.parse(request.params);
+    const body = upsertRatingBodySchema.parse(request.body);
+    const adventure = await db.withTransaction((client) =>
+      upsertAdventureRating(
+        {
+          viewerId: viewer.id,
+          adventureId: params.id,
+          score: body.score
+        },
+        client
+      )
+    );
+
+    if (!adventure) {
+      return reply.code(404).send({
+        error: "Adventure not found."
+      });
+    }
+
+    return {
+      item: adventure
+    };
+  });
+
+  app.delete("/adventures/:id/rating", async (request, reply) => {
+    const viewer = request.authContext?.viewer;
+    if (!viewer) {
+      return reply.code(403).send({
+        error: "Adventure ratings require a completed local account."
+      });
+    }
+
+    detailQuerySchema.parse(request.query);
+    emptyBodySchema.parse(request.body ?? {});
+    const params = detailParamsSchema.parse(request.params);
+    const adventure = await db.withTransaction((client) =>
+      deleteAdventureRating(
+        {
+          viewerId: viewer.id,
+          adventureId: params.id
+        },
+        client
+      )
+    );
+
+    if (!adventure) {
+      return reply.code(404).send({
+        error: "Adventure not found."
+      });
+    }
+
+    return {
+      item: adventure
+    };
   });
 
   app.post("/adventures/:id/favorite", async (request, reply) => {

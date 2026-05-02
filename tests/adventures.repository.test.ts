@@ -14,11 +14,13 @@ import {
   createAdventure,
   createAdventureComment,
   deleteAdventureFavorite,
+  deleteAdventureRating,
   getAdventureById,
   insertAdventureFavorite,
   listAdventureComments,
   listAdventureMedia,
-  listFeed
+  listFeed,
+  upsertAdventureRating
 } from "../src/features/adventures/repository.js";
 
 describe("adventures repository", () => {
@@ -269,6 +271,7 @@ describe("adventures repository", () => {
           comment_count: null,
           rating_count: null,
           average_rating: null,
+          viewer_rating: 4,
           place_label: "Topanga",
           updated_at: "2026-03-03T00:00:00.000Z",
           is_favorited: true
@@ -284,7 +287,50 @@ describe("adventures repository", () => {
     expect(result).toEqual(expect.objectContaining({
       id: "adventure-1",
       isFavorited: true,
+      viewerRating: 4,
       updatedAt: "2026-03-03T00:00:00.000Z"
+    }));
+  });
+
+  it("returns null viewerRating on detail when the viewer has not rated yet", async () => {
+    dbMock.query.mockResolvedValue({
+      rows: [
+        {
+          id: "adventure-1",
+          title: "Quiet Ridge",
+          description: null,
+          category_slug: "viewpoints",
+          visibility: "public",
+          created_at: "2026-03-01T00:00:00.000Z",
+          published_at: null,
+          latitude: null,
+          longitude: null,
+          author_handle: "jacksanfil",
+          author_display_name: null,
+          author_home_city: null,
+          author_home_region: null,
+          primary_media_id: null,
+          primary_media_storage_key: null,
+          favorite_count: 2,
+          comment_count: 1,
+          rating_count: 12,
+          average_rating: 4.5,
+          viewer_rating: null,
+          place_label: "Topanga",
+          updated_at: "2026-03-03T00:00:00.000Z",
+          is_favorited: false
+        }
+      ]
+    });
+
+    const result = await getAdventureById({
+      adventureId: "4b5edc1d-f292-45b4-8972-7b977ebf5298",
+      viewerId: "viewer-123"
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      id: "adventure-1",
+      viewerRating: null
     }));
   });
 
@@ -718,5 +764,231 @@ describe("adventures repository", () => {
       expect.stringContaining("comment_count = excluded.comment_count"),
       ["4b5edc1d-f292-45b4-8972-7b977ebf5298"]
     );
+  });
+
+  it("preserves imported legacy rating baseline when refreshing stats after a comment", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            title: "Quiet Ridge",
+            description: null,
+            category_slug: "viewpoints",
+            visibility: "public",
+            created_at: "2026-03-01T00:00:00.000Z",
+            published_at: null,
+            latitude: null,
+            longitude: null,
+            author_handle: "jacksanfil",
+            author_display_name: null,
+            author_home_city: null,
+            author_home_region: null,
+            primary_media_id: null,
+            primary_media_storage_key: null,
+            favorite_count: 1,
+            comment_count: 0,
+            rating_count: 12,
+            average_rating: 4.5,
+            place_label: null,
+            updated_at: "2026-03-03T00:00:00.000Z",
+            is_favorited: false
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "comment-1",
+            body: "Still want to try this.",
+            created_at: "2026-03-07 02:00:00-08:00",
+            updated_at: "2026-03-07 03:15:00-08:00",
+            author_handle: "asanfil",
+            author_display_name: "Anthony",
+            author_home_city: "Los Angeles",
+            author_home_region: "CA"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await createAdventureComment({
+      adventureId: "4b5edc1d-f292-45b4-8972-7b977ebf5298",
+      authorUserId: "viewer-123",
+      body: "Still want to try this."
+    });
+
+    expect(dbMock.query.mock.calls[2]?.[0]).toContain("legacy_rating_count");
+    expect(dbMock.query.mock.calls[2]?.[0]).toContain("legacy_rating_sum");
+    expect(dbMock.query.mock.calls[2]?.[0]).toContain(
+      "coalesce(existing_stats.legacy_rating_count, 0) + coalesce(ratings.live_rating_count, 0)"
+    );
+    expect(dbMock.query.mock.calls[2]?.[0]).toContain(
+      "coalesce(existing_stats.legacy_rating_sum, 0) + coalesce(ratings.live_rating_sum, 0)"
+    );
+  });
+
+  it("upserts a viewer rating and returns the hydrated adventure detail", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            title: "Quiet Ridge",
+            description: null,
+            category_slug: "viewpoints",
+            visibility: "public",
+            created_at: "2026-03-01T00:00:00.000Z",
+            published_at: null,
+            latitude: null,
+            longitude: null,
+            author_handle: "jacksanfil",
+            author_display_name: null,
+            author_home_city: null,
+            author_home_region: null,
+            primary_media_id: null,
+            primary_media_storage_key: null,
+            favorite_count: 1,
+            comment_count: 0,
+            rating_count: 12,
+            average_rating: 4.5,
+            viewer_rating: null,
+            place_label: null,
+            updated_at: "2026-03-03T00:00:00.000Z",
+            is_favorited: false
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            title: "Quiet Ridge",
+            description: null,
+            category_slug: "viewpoints",
+            visibility: "public",
+            created_at: "2026-03-01T00:00:00.000Z",
+            published_at: null,
+            latitude: null,
+            longitude: null,
+            author_handle: "jacksanfil",
+            author_display_name: null,
+            author_home_city: null,
+            author_home_region: null,
+            primary_media_id: null,
+            primary_media_storage_key: null,
+            favorite_count: 1,
+            comment_count: 0,
+            rating_count: 13,
+            average_rating: 4.46,
+            viewer_rating: 4,
+            place_label: null,
+            updated_at: "2026-03-03T00:00:00.000Z",
+            is_favorited: false
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await upsertAdventureRating({
+      viewerId: "viewer-123",
+      adventureId: "4b5edc1d-f292-45b4-8972-7b977ebf5298",
+      score: 4
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      id: "adventure-1",
+      viewerRating: 4
+    }));
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("insert into public.adventure_ratings"),
+      ["viewer-123", "4b5edc1d-f292-45b4-8972-7b977ebf5298", 4]
+    );
+    expect(dbMock.query.mock.calls[1]?.[0]).toContain("on conflict (user_id, adventure_id) do update set");
+    expect(dbMock.query.mock.calls[2]?.[0]).toContain("legacy_rating_count");
+  });
+
+  it("deletes a viewer rating idempotently and preserves the legacy baseline", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            title: "Quiet Ridge",
+            description: null,
+            category_slug: "viewpoints",
+            visibility: "public",
+            created_at: "2026-03-01T00:00:00.000Z",
+            published_at: null,
+            latitude: null,
+            longitude: null,
+            author_handle: "jacksanfil",
+            author_display_name: null,
+            author_home_city: null,
+            author_home_region: null,
+            primary_media_id: null,
+            primary_media_storage_key: null,
+            favorite_count: 1,
+            comment_count: 0,
+            rating_count: 13,
+            average_rating: 4.46,
+            viewer_rating: 4,
+            place_label: null,
+            updated_at: "2026-03-03T00:00:00.000Z",
+            is_favorited: false
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "adventure-1",
+            title: "Quiet Ridge",
+            description: null,
+            category_slug: "viewpoints",
+            visibility: "public",
+            created_at: "2026-03-01T00:00:00.000Z",
+            published_at: null,
+            latitude: null,
+            longitude: null,
+            author_handle: "jacksanfil",
+            author_display_name: null,
+            author_home_city: null,
+            author_home_region: null,
+            primary_media_id: null,
+            primary_media_storage_key: null,
+            favorite_count: 1,
+            comment_count: 0,
+            rating_count: 12,
+            average_rating: 4.5,
+            viewer_rating: null,
+            place_label: null,
+            updated_at: "2026-03-03T00:00:00.000Z",
+            is_favorited: false
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await deleteAdventureRating({
+      viewerId: "viewer-123",
+      adventureId: "4b5edc1d-f292-45b4-8972-7b977ebf5298"
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      id: "adventure-1",
+      viewerRating: null
+    }));
+    expect(dbMock.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("delete from public.adventure_ratings"),
+      ["viewer-123", "4b5edc1d-f292-45b4-8972-7b977ebf5298"]
+    );
+    expect(dbMock.query.mock.calls[2]?.[0]).toContain("legacy_rating_count");
   });
 });

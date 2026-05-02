@@ -84,6 +84,7 @@ function makeAdventureRow(overrides: Record<string, unknown> = {}) {
     comment_count: 3,
     rating_count: 2,
     average_rating: 4.5,
+    viewer_rating: null,
     place_label: "Hidden Falls Trailhead",
     is_favorited: false,
     distance_miles: null,
@@ -715,7 +716,8 @@ describe("buildApp", () => {
           ratingCount: 2,
           averageRating: 4.5
         },
-        isFavorited: false
+        isFavorited: false,
+        viewerRating: null
       }
     });
     await app.close();
@@ -1019,6 +1021,83 @@ describe("buildApp", () => {
       item: expect.objectContaining({
         id: "adventure-1",
         isFavorited: false
+      })
+    });
+
+    await app.close();
+  });
+
+  it("upserts a rating through the registered app routes", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ viewer_rating: null, rating_count: 2, average_rating: 4.5 })]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: []
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: []
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ viewer_rating: 4, rating_count: 3, average_rating: 4.33 })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/rating",
+      headers: authHeaders(),
+      payload: {
+        score: 4
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        id: "adventure-1",
+        viewerRating: 4
+      })
+    });
+
+    await app.close();
+  });
+
+  it("deletes a rating through the registered app routes", async () => {
+    dbMock.query
+      .mockResolvedValueOnce({
+        rows: [makeLocalUserRow()]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ viewer_rating: 4, rating_count: 3, average_rating: 4.33 })]
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: []
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: []
+      } as QueryRows<Record<string, unknown>>)
+      .mockResolvedValueOnce({
+        rows: [makeAdventureRow({ viewer_rating: null, rating_count: 2, average_rating: 4.5 })]
+      } as QueryRows<Record<string, unknown>>);
+
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/api/adventures/3bb3ba5f-06ae-4f5e-a6ce-45cb62cc87ab/rating",
+      headers: authHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      item: expect.objectContaining({
+        id: "adventure-1",
+        viewerRating: null
       })
     });
 
